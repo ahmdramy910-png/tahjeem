@@ -47,20 +47,21 @@ app.post('/api/employees', (req, res) => {
   res.json({ employees: db.employees });
 });
 
-// 3. تحليل السكرين شوت بالذكاء الاصطناعي (Gemini 3.6 Flash)
+// 3. تحليل السكرين شوت عبر OpenRouter (مجاني ومستقر)
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: 'لم يتم استلام أي ملف صورة' });
+      return res.status(400).json({ error: 'لم يتم استلام ملف صورة' });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return res.status(500).json({ error: 'مفتاح GEMINI_API_KEY غير موجود في إعدادات Render' });
+      return res.status(500).json({ error: 'مفتاح الـ API غير معرف في Render' });
     }
 
     const base64Image = req.file.buffer.toString('base64');
     const mimeType = req.file.mimetype || 'image/png';
+    const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
     const prompt = `
 أنت نظام استخراج بيانات لشاشة Sage CRM لنظام LCL في شركة لوجستية.
@@ -74,43 +75,43 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
   "location": "الموقع من جدول B\\L Location في الأسفل (الأكثر تكراراً)",
   "clearanceCompany": "اسم شركة التخليص من Company clearance"
 }
-إذا تعذر قراءة حقل معين، اتركه قيمة نصية فارغة "". لا تكتب أي نصوص خارج الـ JSON.
+إذا تعذر قراءة حقل معين، اتركه قيمة نصية فارغة "". أرجع الـ JSON فقط بدون markdown.
 `;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
-
-    const response = await fetch(url, {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://tahjeem.onrender.com',
+        'X-Title': 'Tahjeem Logistics System'
+      },
       body: JSON.stringify({
-        contents: [
+        model: 'openrouter/free',
+        messages: [
           {
-            parts: [
-              { text: prompt },
-              {
-                inline_data: {
-                  mime_type: mimeType,
-                  data: base64Image
-                }
-              }
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: dataUrl } }
             ]
           }
         ],
-        generationConfig: {
-          response_mime_type: "application/json"
-        }
+        response_format: { type: 'json_object' }
       })
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('Gemini API Error:', data);
-      return res.status(500).json({ error: data.error?.message || 'خطأ في معالجة الذكاء الاصطناعي' });
+      console.error('OpenRouter Error:', data);
+      return res.status(500).json({ error: data.error?.message || 'خطأ في معالجة مزود الذكاء الاصطناعي' });
     }
 
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-    const parsed = JSON.parse(rawText);
+    let rawContent = data.choices?.[0]?.message?.content || '{}';
+    // تنظيف أي زوائد markdown إن وجدت
+    rawContent = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(rawContent);
     return res.json(parsed);
 
   } catch (err) {
@@ -139,14 +140,14 @@ app.post('/api/orders', (req, res) => {
   res.json(newOrder);
 });
 
-// 5. اعتماد التحجيم من شريف
+// 5. حفظ واعتماد التحجيم من شريف
 app.patch('/api/orders/:id/tahjeem', (req, res) => {
   const db = loadDB();
   const order = db.orders.find(o => o.id === req.params.id);
   if (!order) return res.status(404).json({ error: 'الطلب غير موجود' });
 
   order.measurements = req.body.measurements;
-  order.vehicleType = req.body.vehicleType;
+  order.vehicleType = req.body.vehicleType || '';
   order.shareefNotes = req.body.shareefNotes || '';
   order.status = 'تم التحجيم';
   order.completedAt = new Date().toISOString();
