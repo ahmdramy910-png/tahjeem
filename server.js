@@ -9,12 +9,11 @@ const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '15mb' }));
 app.use(express.static('public'));
 
 const DB_FILE = path.join(__dirname, 'db.json');
 
-// تهيئة قاعدة البيانات المحلية
 function loadDB() {
   if (!fs.existsSync(DB_FILE)) {
     const initialData = {
@@ -31,15 +30,12 @@ function saveDB(data) {
   fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
 }
 
-// ================= API Endpoints =================
-
-// 1. جلب الموظفين والطلبات
+// 1. جلب البيانات
 app.get('/api/data', (req, res) => {
-  const db = loadDB();
-  res.json(db);
+  res.json(loadDB());
 });
 
-// 2. إضافة موظف جديد
+// 2. إضافة موظف
 app.post('/api/employees', (req, res) => {
   const { name } = req.body;
   if (!name) return res.status(400).json({ error: 'الاسم مطلوب' });
@@ -51,67 +47,90 @@ app.post('/api/employees', (req, res) => {
   res.json({ employees: db.employees });
 });
 
-// 3. تحليل سكرين شوت نظام الـ CRM واستخراج البيانات
+// 3. تحليل السكرين شوت بالذكاء الاصطناعي بدقة عالية وسرعة
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'لم يتم رفع صورة' });
-
-    const base64Image = req.file.buffer.toString('base64');
-    const mimeType = req.file.mimetype;
-
-    // استدعاء Gemini Vision أو أي Vision API
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: 'مفتاح الـ API غير مضبوط في السيرفر' });
+    if (!req.file) {
+      return res.status(400).json({ error: 'لم يتم استلام أي ملف صورة' });
     }
 
-    const prompt = `
-أنت خبير إدخال بيانات لوجستية. المطلوب استخراج البيانات من شاشة نظام Sage CRM (LCL Container Detail) وإرجاعها فقط بصيغة JSON بدون أي كلام إضافي أو علامات markdown:
-{
-  "blNumber": "رقم البوليصة من B/L No.",
-  "alvSerial": "رقم ALV Serial",
-  "qty": "العدد من حقل QTY كرقم صحيح",
-  "weight": "الوزن من Weight(Ton) مقرباً للرقم الأعلى بمقدار 0.1 (مثال: 1.611 تصبح 1.7)",
-  "pallets": "عدد البلتات من ALV Pallet كرقم",
-  "location": "الموقع الأكثر تكراراً من جدول B\\L Location في الأسفل",
-  "clearanceCompany": "اسم شركة التخليص من حقل Company clearance"
-}
-    `;
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.error('Missing GEMINI_API_KEY');
+      return res.status(500).json({ error: 'مفتاح GEMINI_API_KEY غير موجود في إعدادات Render' });
+    }
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    const base64Image = req.file.buffer.toString('base64');
+    const mimeType = req.file.mimetype || 'image/png';
+
+    const prompt = `
+أنت نظام استخراج بيانات لشاشة Sage CRM لنظام LCL في شركة لوجستية.
+استخرج الحقول التالية بدقة من الصورة وأرجع فقط كائن JSON صالح بالحقول التالية:
+{
+  "blNumber": "رقم البوليصة من خانة B/L No.",
+  "alvSerial": "رقم ALV Serial",
+  "qty": "العدد من خانة QTY كرقم صحيح",
+  "weight": "الوزن من Weight(Ton) مقرباً للرقم الأعلى بمقدار 0.1 (مثال: إذا كان 1.611 اجعله 1.7)",
+  "pallets": "عدد البلتات من خانة ALV Pallet كرقم",
+  "location": "الموقع من جدول B\\L Location في الأسفل (الأكثر تكراراً)",
+  "clearanceCompany": "اسم شركة التخليص من Company clearance"
+}
+إذا تعذر قراءة حقل معين، اتركه قيمة نصية فارغة "". لا تكتب أي نصوص خارج الـ JSON.
+`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inlineData: { mimeType: mimeType, data: base64Image } }
-          ]
-        }]
+        contents: [
+          {
+            parts: [
+              { text: prompt },
+              {
+                inline_data: {
+                  mime_type: mimeType,
+                  data: base64Image
+                }
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          response_mime_type: "application/json"
+        }
       })
     });
 
-    const result = await response.json();
-    const textOutput = result.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-    const cleanedJson = textOutput.replace(/```json|```/g, '').trim();
-    const parsedData = JSON.parse(cleanedJson);
+    const data = await response.json();
 
-    res.json(parsedData);
+    if (!response.ok) {
+      console.error('Gemini API Error:', data);
+      return res.status(500).json({ error: data.error?.message || 'خطأ من مزود الذكاء الاصطناعي' });
+    }
+
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    const parsed = JSON.parse(rawText);
+    
+    console.log('Extracted Data:', parsed);
+    return res.json(parsed);
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'فشل استخراج البيانات من الصورة: ' + err.message });
+    console.error('OCR Endpoint Error:', err);
+    return res.status(500).json({ error: 'فشل معالجة الصورة: ' + err.message });
   }
 });
 
-// 4. إنشاء طلب تحجيم جديد
+// 4. إنشاء طلب جديد
 app.post('/api/orders', (req, res) => {
   const db = loadDB();
   const newOrder = {
-    id: 'ORD-' + Date.now().toString().slice(-6),
+    id: 'ORD-' + Math.floor(100000 + Math.random() * 900000),
     createdAt: new Date().toISOString(),
-    createdBy: req.body.createdBy || 'غير محدد',
+    createdBy: req.body.createdBy || 'خدمة العملاء',
     status: 'بانتظار التحجيم',
-    bls: req.body.bls || [], // مصفوفة لغاية 3 بوالص
+    bls: req.body.bls || [],
     totalWeight: req.body.totalWeight || 0,
     measurements: { length: '', width: '', height: '' },
     vehicleType: '',
@@ -123,14 +142,14 @@ app.post('/api/orders', (req, res) => {
   res.json(newOrder);
 });
 
-// 5. تحديث التحجيم من قبل شريف
+// 5. تحديث التحجيم من شريف
 app.patch('/api/orders/:id/tahjeem', (req, res) => {
   const db = loadDB();
   const order = db.orders.find(o => o.id === req.params.id);
   if (!order) return res.status(404).json({ error: 'الطلب غير موجود' });
 
   order.measurements = req.body.measurements;
-  order.vehicleType = req.body.vehicleType; // بنقو، ديانا، LB، سنقل، تريلا
+  order.vehicleType = req.body.vehicleType;
   order.shareefNotes = req.body.shareefNotes || '';
   order.status = 'تم التحجيم';
   order.completedAt = new Date().toISOString();
@@ -139,7 +158,7 @@ app.patch('/api/orders/:id/tahjeem', (req, res) => {
   res.json(order);
 });
 
-// 6. حذف الطلبات الأقدم من أسبوع
+// 6. حذف الطلبات القديمة
 app.delete('/api/orders/old', (req, res) => {
   const db = loadDB();
   const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -148,5 +167,5 @@ app.delete('/api/orders/old', (req, res) => {
   res.json({ success: true, count: db.orders.length });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
