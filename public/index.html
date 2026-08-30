@@ -115,9 +115,14 @@
           <div class="text-lg font-bold text-gray-700">
             الوزن الإجمالي للطلب: <span id="totalWeightDisplay" class="text-blue-600 font-extrabold text-xl">0.00</span> طن
           </div>
-          <button onclick="submitOrder()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-6 rounded-lg shadow-md transition transform active:scale-95 flex items-center gap-2">
-            <span>🚀 إرسال لشريف بالمستودع</span>
-          </button>
+          <div class="flex gap-3">
+            <button onclick="printDraftManualSlip()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-5 rounded-lg shadow-md transition flex items-center gap-2">
+              <span>🖨️ طباعة إشعار يدوي (احتياطي)</span>
+            </button>
+            <button onclick="submitOrder()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-6 rounded-lg shadow-md transition transform active:scale-95 flex items-center gap-2">
+              <span>🚀 إرسال لشريف بالمستودع</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -165,10 +170,17 @@
     async function loadData() {
       try {
         const res = await fetch('/api/data');
-        state = await res.json();
+        const newData = await res.json();
+        
+        const dataChanged = JSON.stringify(state) !== JSON.stringify(newData);
+        state = newData;
+
         renderEmployees();
         renderOrders();
-        renderWarehouse();
+        
+        if (dataChanged && !document.activeElement?.matches('input')) {
+          renderWarehouse();
+        }
       } catch (err) {
         console.error(err);
       }
@@ -176,7 +188,9 @@
 
     function renderEmployees() {
       const select = document.getElementById('employeeSelect');
-      select.innerHTML = state.employees.map(e => `<option value="${e}">${e}</option>`).join('');
+      if (select.children.length !== state.employees.length) {
+        select.innerHTML = state.employees.map(e => `<option value="${e}">${e}</option>`).join('');
+      }
     }
 
     async function addNewEmployee() {
@@ -201,6 +215,7 @@
         document.getElementById('section-warehouse').classList.remove('hidden');
         document.getElementById('tab-wh').className = "py-3 px-6 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition";
         document.getElementById('tab-cs').className = "py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition";
+        renderWarehouse();
       }
     }
 
@@ -211,6 +226,25 @@
         total += val;
       }
       document.getElementById('totalWeightDisplay').innerText = total.toFixed(2);
+    }
+
+    function getFilledBLs() {
+      const bls = [];
+      for (let i = 0; i < 3; i++) {
+        const no = document.getElementById(`bl-${i}-no`).value.trim();
+        if (no) {
+          bls.push({
+            blNumber: no,
+            alvSerial: document.getElementById(`bl-${i}-alv`).value.trim(),
+            qty: document.getElementById(`bl-${i}-qty`).value.trim(),
+            weight: parseFloat(document.getElementById(`bl-${i}-weight`).value) || 0,
+            pallets: document.getElementById(`bl-${i}-pallets`).value.trim(),
+            location: document.getElementById(`bl-${i}-loc`).value.trim(),
+            clearanceCompany: document.getElementById(`bl-${i}-company`).value.trim(),
+          });
+        }
+      }
+      return bls;
     }
 
     async function handleOCR(e, index) {
@@ -247,23 +281,82 @@
       }
     }
 
-    async function submitOrder() {
-      const bls = [];
-      for (let i = 0; i < 3; i++) {
-        const no = document.getElementById(`bl-${i}-no`).value.trim();
-        if (no) {
-          bls.push({
-            blNumber: no,
-            alvSerial: document.getElementById(`bl-${i}-alv`).value.trim(),
-            qty: document.getElementById(`bl-${i}-qty`).value.trim(),
-            weight: parseFloat(document.getElementById(`bl-${i}-weight`).value) || 0,
-            pallets: document.getElementById(`bl-${i}-pallets`).value.trim(),
-            location: document.getElementById(`bl-${i}-loc`).value.trim(),
-            clearanceCompany: document.getElementById(`bl-${i}-company`).value.trim(),
-          });
-        }
+    function printDraftManualSlip() {
+      const bls = getFilledBLs();
+      if (bls.length === 0) {
+        alert('يرجى تعبئة أو سحب بوليصة واحدة على الأقل للطباعة');
+        return;
       }
 
+      const totalWeight = document.getElementById('totalWeightDisplay').innerText;
+      const employee = document.getElementById('employeeSelect').value;
+
+      const printWindow = window.open('', '', 'width=800,height=600');
+      printWindow.document.write(`
+        <html dir="rtl">
+        <head><title>إشعار تحجيم يدوي (احتياطي)</title>
+        <style>
+          body { font-family: sans-serif; padding: 25px; line-height: 1.5; }
+          table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+          th, td { border: 1.5px solid #333; padding: 8px; text-align: center; }
+          th { background: #f0f0f0; }
+          .box { border: 2px dashed #444; padding: 15px; margin-top: 20px; border-radius: 8px; }
+          .grid { display: flex; justify-content: space-between; margin: 15px 0; }
+        </style>
+        </head>
+        <body>
+          <h2 style="text-align: center; margin-bottom: 5px;">شركة العقبة للوجستيات - إشعار تحجيم بضاعة (نسخة يدوية)</h2>
+          <p style="text-align: center; font-size: 13px; color: #555;">التاريخ: ${new Date().toLocaleString('ar-EG')} | الموظف: ${employee}</p>
+          
+          <table>
+            <tr>
+              <th>رقم البوليصة</th>
+              <th>ALV Serial</th>
+              <th>العدد</th>
+              <th>الوزن (طن)</th>
+              <th>البلتات</th>
+              <th>الموقع (Location)</th>
+              <th>شركة التخليص</th>
+            </tr>
+            ${bls.map(b => `
+              <tr>
+                <td><b>${b.blNumber}</b></td>
+                <td>${b.alvSerial}</td>
+                <td>${b.qty}</td>
+                <td><b>${b.weight}</b></td>
+                <td>${b.pallets}</td>
+                <td style="color: red; font-weight: bold; font-size: 16px;">${b.location}</td>
+                <td>${b.clearanceCompany}</td>
+              </tr>
+            `).join('')}
+          </table>
+
+          <div style="font-size: 16px; font-weight: bold; margin: 10px 0;">
+            الوزن الإجمالي المقدر: ${totalWeight} طن
+          </div>
+
+          <div class="box">
+            <h3 style="margin-top: 0;">يُعبأ يدوياً بواسطة مسؤول المستودع (شريف):</h3>
+            <div class="grid">
+              <div><b>الطول (L):</b> _________ م</div>
+              <div><b>العرض (W):</b> _________ م</div>
+              <div><b>الارتفاع (H):</b> _________ م</div>
+            </div>
+            <div style="margin-top: 15px;">
+              <b>نوع السيارة الموصى بها:</b> &nbsp;&nbsp;&nbsp; [ &nbsp; ] ديانا &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [ &nbsp; ] تريلا
+            </div>
+            <div style="margin-top: 15px;">
+              <b>ملاحظات المستودع والتوقيع:</b> ____________________________________
+            </div>
+          </div>
+          <script>window.print();<\/script>
+        </body></html>
+      `);
+      printWindow.document.close();
+    }
+
+    async function submitOrder() {
+      const bls = getFilledBLs();
       if (bls.length === 0) {
         alert('يرجى إدخال بيانات بوليصة واحدة على الأقل');
         return;
@@ -289,6 +382,7 @@
       }
       calcTotalWeight();
       loadData();
+      alert('تم إرسال الطلب لشريف بالمستودع بنجاح 🚀');
     }
 
     function renderOrders() {
@@ -304,7 +398,7 @@
             <td class="p-3"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${isDone ? 'badge-done' : 'badge-tahjeem'}">${order.status}</span></td>
             <td class="p-3 font-bold text-indigo-700">${order.vehicleType || '-'}</td>
             <td class="p-3">
-              ${isDone ? `<button onclick="printOrderSlip('${order.id}')" class="bg-gray-800 hover:bg-black text-white px-3 py-1 rounded text-xs">🖨️ طباعة السليب</button>` : '<span class="text-gray-400 text-xs">بانتظار القياسات</span>'}
+              ${isDone ? `<button onclick="printOrderSlip('${order.id}')" class="bg-gray-800 hover:bg-black text-white px-3 py-1 rounded text-xs font-bold">🖨️ طباعة الإشعار المكتمل</button>` : '<span class="text-gray-400 text-xs">بانتظار التحجيم</span>'}
             </td>
           </tr>
         `;
@@ -319,6 +413,13 @@
         return;
       }
 
+      const currentValues = {};
+      pending.forEach(o => {
+        currentValues[`l-${o.id}`] = document.getElementById(`m-l-${o.id}`)?.value || '';
+        currentValues[`w-${o.id}`] = document.getElementById(`m-w-${o.id}`)?.value || '';
+        currentValues[`h-${o.id}`] = document.getElementById(`m-h-${o.id}`)?.value || '';
+      });
+
       container.innerHTML = pending.map(order => `
         <div class="border-2 border-yellow-400 bg-yellow-50/30 rounded-xl p-5 shadow space-y-4">
           <div class="flex justify-between items-center border-b pb-2">
@@ -326,10 +427,10 @@
             <span class="text-xs bg-yellow-200 text-yellow-800 font-bold px-2 py-1 rounded">الوزن: ${order.totalWeight} طن</span>
           </div>
           <div class="space-y-2">
-            ${order.bls.map((b, idx) => `
+            ${order.bls.map((b) => `
               <div class="bg-white p-3 rounded border text-sm grid grid-cols-2 gap-2">
                 <div><span class="text-gray-500 text-xs">بوليصة:</span> <b>${b.blNumber}</b></div>
-                <div><span class="text-gray-500 text-xs">الموقع:</span> <b class="text-red-600">${b.location}</b></div>
+                <div><span class="text-gray-500 text-xs">الموقع:</span> <b class="text-red-600 text-base">${b.location}</b></div>
                 <div><span class="text-gray-500 text-xs">العدد:</span> ${b.qty}</div>
                 <div><span class="text-gray-500 text-xs">البلتات:</span> ${b.pallets}</div>
               </div>
@@ -338,13 +439,13 @@
           <div class="bg-white p-4 rounded-lg border space-y-3">
             <div class="font-bold text-sm text-gray-700">أدخل أبعاد التحجيم (متر):</div>
             <div class="grid grid-cols-3 gap-2">
-              <input type="number" step="0.1" id="m-l-${order.id}" placeholder="الطول L" class="border rounded p-2 text-center text-sm font-bold">
-              <input type="number" step="0.1" id="m-w-${order.id}" placeholder="العرض W" class="border rounded p-2 text-center text-sm font-bold">
-              <input type="number" step="0.1" id="m-h-${order.id}" placeholder="الارتفاع H" class="border rounded p-2 text-center text-sm font-bold">
+              <input type="number" step="0.01" id="m-l-${order.id}" value="${currentValues[`l-${order.id}`] || ''}" placeholder="الطول L" class="border rounded p-2 text-center text-sm font-bold focus:ring-2 focus:ring-yellow-400">
+              <input type="number" step="0.01" id="m-w-${order.id}" value="${currentValues[`w-${order.id}`] || ''}" placeholder="العرض W" class="border rounded p-2 text-center text-sm font-bold focus:ring-2 focus:ring-yellow-400">
+              <input type="number" step="0.01" id="m-h-${order.id}" value="${currentValues[`h-${order.id}`] || ''}" placeholder="الارتفاع H" class="border rounded p-2 text-center text-sm font-bold focus:ring-2 focus:ring-yellow-400">
             </div>
             <div class="grid grid-cols-2 gap-2 pt-2">
-              <button onclick="confirmTahjeem('${order.id}', 'ديانا')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded text-sm transition">🚚 ديانا</button>
-              <button onclick="confirmTahjeem('${order.id}', 'تريلا')" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded text-sm transition">🚛 تريلا</button>
+              <button onclick="confirmTahjeem('${order.id}', 'ديانا')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded text-sm transition shadow">🚚 ديانا</button>
+              <button onclick="confirmTahjeem('${order.id}', 'تريلا')" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded text-sm transition shadow">🚛 تريلا</button>
             </div>
           </div>
         </div>
@@ -374,17 +475,17 @@
       const printWindow = window.open('', '', 'width=800,height=600');
       printWindow.document.write(`
         <html dir="rtl">
-        <head><title>سليب تحجيم - ${order.id}</title>
+        <head><title>إشعار تحجيم مكتمل - ${order.id}</title>
         <style>body{font-family:sans-serif;padding:20px;}table{width:100%;border-collapse:collapse;margin:20px 0;}th,td{border:1px solid #ddd;padding:8px;text-align:right;}th{background:#f4f4f4;}</style>
         </head>
         <body>
-          <h2>سليب تحجيم البضاعة - شركة العقبة للوجستيات</h2>
+          <h2>إشعار تحجيم البضاعة - شركة العقبة للوجستيات</h2>
           <p><b>رقم الطلب:</b> ${order.id} | <b>التاريخ:</b> ${new Date(order.createdAt).toLocaleString('ar-EG')}</p>
-          <p><b>السيارة المختارة:</b> ${order.vehicleType} | <b>الوزن الإجمالي:</b> ${order.totalWeight} طن</p>
+          <p><b>السيارة المختارة:</b> <b style="font-size: 18px; color: blue;">${order.vehicleType}</b> | <b>الوزن الإجمالي:</b> ${order.totalWeight} طن</p>
           <p><b>القياسات:</b> طول: ${order.measurements.length || '-'}م | عرض: ${order.measurements.width || '-'}م | ارتفاع: ${order.measurements.height || '-'}م</p>
           <table>
             <tr><th>رقم البوليصة</th><th>ALV Serial</th><th>العدد</th><th>الوزن</th><th>البلتات</th><th>الموقع</th><th>شركة التخليص</th></tr>
-            ${order.bls.map(b => `<tr><td>${b.blNumber}</td><td>${b.alvSerial}</td><td>${b.qty}</td><td>${b.weight}</td><td>${b.pallets}</td><td>${b.location}</td><td>${b.clearanceCompany}</td></tr>`).join('')}
+            ${order.bls.map(b => `<tr><td><b>${b.blNumber}</b></td><td>${b.alvSerial}</td><td>${b.qty}</td><td>${b.weight}</td><td>${b.pallets}</td><td style="color:red; font-weight:bold;">${b.location}</td><td>${b.clearanceCompany}</td></tr>`).join('')}
           </table>
           <script>window.print();<\/script>
         </body></html>
