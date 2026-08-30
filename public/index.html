@@ -343,7 +343,7 @@
               <div><b>الارتفاع (H):</b> _________ م</div>
             </div>
             <div style="margin-top: 15px;">
-              <b>نوع السيارة الموصى بها:</b> &nbsp;&nbsp;&nbsp; [ &nbsp; ] ديانا &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [ &nbsp; ] تريلا
+              <b>نوع السيارة الموصى بها:</b> &nbsp;&nbsp;&nbsp; [ &nbsp; ] بنقو &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [ &nbsp; ] ديانا &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [ &nbsp; ] LB &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [ &nbsp; ] تريلا
             </div>
             <div style="margin-top: 15px;">
               <b>ملاحظات المستودع والتوقيع:</b> ____________________________________
@@ -453,8 +453,11 @@
               <input type="number" step="0.01" id="m-w-${order.id}" value="${currentValues[`w-${order.id}`] || ''}" placeholder="العرض W" class="border rounded p-2 text-center text-sm font-bold focus:ring-2 focus:ring-yellow-400">
               <input type="number" step="0.01" id="m-h-${order.id}" value="${currentValues[`h-${order.id}`] || ''}" placeholder="الارتفاع H" class="border rounded p-2 text-center text-sm font-bold focus:ring-2 focus:ring-yellow-400">
             </div>
-            <div class="grid grid-cols-2 gap-2 pt-2">
-              <button onclick="confirmTahjeem('${order.id}', 'ديانا')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded text-sm transition shadow">🚚 ديانا</button>
+            <div class="font-bold text-xs text-gray-600 pt-1">اختر نوع السيارة للاعتماد:</div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <button onclick="confirmTahjeem('${order.id}', 'بنقو')" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 rounded text-sm transition shadow">🚐 بنقو</button>
+              <button onclick="confirmTahjeem('${order.id}', 'ديانة')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded text-sm transition shadow">🚚 ديانة</button>
+              <button onclick="confirmTahjeem('${order.id}', 'LB')" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 rounded text-sm transition shadow">🚛 LB</button>
               <button onclick="confirmTahjeem('${order.id}', 'تريلا')" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded text-sm transition shadow">🚛 تريلا</button>
             </div>
           </div>
