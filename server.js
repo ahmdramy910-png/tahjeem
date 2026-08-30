@@ -47,7 +47,7 @@ app.post('/api/employees', (req, res) => {
   res.json({ employees: db.employees });
 });
 
-// 3. تحليل السكرين شوت بالذكاء الاصطناعي بدقة عالية وسرعة
+// 3. تحليل السكرين شوت بالذكاء الاصطناعي (Gemini 3.6 Flash)
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -56,7 +56,6 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      console.error('Missing GEMINI_API_KEY');
       return res.status(500).json({ error: 'مفتاح GEMINI_API_KEY غير موجود في إعدادات Render' });
     }
 
@@ -78,7 +77,7 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
 إذا تعذر قراءة حقل معين، اتركه قيمة نصية فارغة "". لا تكتب أي نصوص خارج الـ JSON.
 `;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
     
     const response = await fetch(url, {
       method: 'POST',
@@ -113,7 +112,6 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
     const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
     const parsed = JSON.parse(rawText);
     
-    console.log('Extracted Data:', parsed);
     return res.json(parsed);
 
   } catch (err) {
@@ -142,7 +140,7 @@ app.post('/api/orders', (req, res) => {
   res.json(newOrder);
 });
 
-// 5. تحديث التحجيم من شريف
+// 5. تحديث التحجيم من المستودع
 app.patch('/api/orders/:id/tahjeem', (req, res) => {
   const db = loadDB();
   const order = db.orders.find(o => o.id === req.params.id);
@@ -158,7 +156,7 @@ app.patch('/api/orders/:id/tahjeem', (req, res) => {
   res.json(order);
 });
 
-// 6. حذف الطلبات القديمة
+// 6. حذف الطلبات القديمة (أسبوع فما فوق)
 app.delete('/api/orders/old', (req, res) => {
   const db = loadDB();
   const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
