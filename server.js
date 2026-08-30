@@ -47,7 +47,7 @@ app.post('/api/employees', (req, res) => {
   res.json({ employees: db.employees });
 });
 
-// 3. تحليل السكرين شوت مع نظام التبديل التلقائي عند الضغط
+// 3. تحليل السكرين شوت بالذكاء الاصطناعي (Gemini 3.6 Flash)
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -77,64 +77,41 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
 إذا تعذر قراءة حقل معين، اتركه قيمة نصية فارغة "". لا تكتب أي نصوص خارج الـ JSON.
 `;
 
-    // قائمة بالموديلات للتبديل التلقائي في حال انشغال أي منها
-    const candidateModels = [
-      'gemini-2.5-flash',
-      'gemini-2.5-pro',
-      'gemini-3-flash',
-      'gemini-2.0-flash'
-    ];
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
 
-    let extractedData = null;
-    let lastErrorMessage = '';
-
-    for (const model of candidateModels) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: prompt },
               {
-                parts: [
-                  { text: prompt },
-                  {
-                    inline_data: {
-                      mime_type: mimeType,
-                      data: base64Image
-                    }
-                  }
-                ]
+                inline_data: {
+                  mime_type: mimeType,
+                  data: base64Image
+                }
               }
-            ],
-            generationConfig: {
-              response_mime_type: "application/json"
-            }
-          })
-        });
-
-        const data = await response.json();
-
-        if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-          const rawText = data.candidates[0].content.parts[0].text;
-          extractedData = JSON.parse(rawText);
-          break; // نجاح العملية، إنهاء المحاولات
-        } else {
-          lastErrorMessage = data.error?.message || 'خطأ غير معروف في الاستجابة';
-          console.warn(`فشل الموديل ${model}، جاري المحاولة مع الموديل التالي... الخطأ:`, lastErrorMessage);
+            ]
+          }
+        ],
+        generationConfig: {
+          response_mime_type: "application/json"
         }
-      } catch (err) {
-        lastErrorMessage = err.message;
-        console.warn(`استثناء في الموديل ${model}:`, err.message);
-      }
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Gemini API Error:', data);
+      return res.status(500).json({ error: data.error?.message || 'خطأ في معالجة الذكاء الاصطناعي' });
     }
 
-    if (extractedData) {
-      return res.json(extractedData);
-    } else {
-      return res.status(500).json({ error: 'تعذر معالجة الصورة حالياً بسبب ضغط الخدمة. تفاصيل: ' + lastErrorMessage });
-    }
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    const parsed = JSON.parse(rawText);
+    return res.json(parsed);
 
   } catch (err) {
     console.error('OCR Endpoint Error:', err);
