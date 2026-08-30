@@ -30,12 +30,12 @@ function saveDB(data) {
   fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
 }
 
-// جلب البيانات
+// 1. جلب البيانات
 app.get('/api/data', (req, res) => {
   res.json(loadDB());
 });
 
-// إضافة موظف
+// 2. إضافة موظف
 app.post('/api/employees', (req, res) => {
   const { name } = req.body;
   if (!name) return res.status(400).json({ error: 'الاسم مطلوب' });
@@ -47,7 +47,7 @@ app.post('/api/employees', (req, res) => {
   res.json({ employees: db.employees });
 });
 
-// استخراج البيانات بالذكاء الاصطناعي
+// 3. استخراج البيانات بالذكاء الاصطناعي (Gemini 3.6 Flash)
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -75,7 +75,7 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
 }
 `;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
     
     const response = await fetch(url, {
       method: 'POST',
@@ -117,7 +117,7 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
   }
 });
 
-// إنشاء طلب
+// 4. إنشاء طلب
 app.post('/api/orders', (req, res) => {
   const db = loadDB();
   const newOrder = {
@@ -137,7 +137,7 @@ app.post('/api/orders', (req, res) => {
   res.json(newOrder);
 });
 
-// اعتماد التحجيم
+// 5. اعتماد التحجيم
 app.patch('/api/orders/:id/tahjeem', (req, res) => {
   const db = loadDB();
   const order = db.orders.find(o => o.id === req.params.id);
@@ -152,7 +152,7 @@ app.patch('/api/orders/:id/tahjeem', (req, res) => {
   res.json(order);
 });
 
-// حذف القديم
+// 6. حذف القديم
 app.delete('/api/orders/old', (req, res) => {
   const db = loadDB();
   const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
