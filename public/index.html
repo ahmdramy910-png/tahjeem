@@ -31,12 +31,13 @@
   </nav>
 
   <div class="max-w-7xl mx-auto px-4 py-6">
-    <div class="flex border-b border-gray-300 mb-6 bg-white rounded-t-lg px-4 pt-2 shadow-sm">
+    <div class="flex border-b border-gray-300 mb-6 bg-white rounded-t-lg px-4 pt-2 shadow-sm flex-wrap gap-2">
       <button onclick="switchTab('cs')" id="tab-cs" class="py-3 px-6 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition">قسم خدمة العملاء (Customer Service)</button>
       <button onclick="switchTab('warehouse')" id="tab-wh" class="py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition">شاشة المستودع (موظف التحجيم)</button>
+      <button onclick="switchTab('archive')" id="tab-arc" class="py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition">📁 الأرشيف الشامل للطلبات (Archive)</button>
     </div>
 
-    <!-- قسم خدمة العملاء -->
+    <!-- 1. قسم خدمة العملاء -->
     <div id="section-cs" class="space-y-6">
       <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
         <h2 class="text-lg font-bold text-blue-900 mb-4 pb-2 border-b border-gray-100 flex items-center justify-between">
@@ -126,13 +127,12 @@
         </div>
       </div>
 
-      <!-- السجل -->
+      <!-- السجل اليومي -->
       <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
         <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
           <h2 class="text-lg font-bold text-gray-800">سجل الطلبات الحالية</h2>
           <div class="flex gap-2">
-            <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2 rounded shadow transition">📊 نهاية اليوم (Excel)</button>
-            <button onclick="deleteOldOrders()" class="bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold px-4 py-2 rounded shadow transition">🗑️ حذف الأقدم من أسبوع</button>
+            <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2 rounded shadow transition">📊 تصدير الطلبات (Excel)</button>
           </div>
         </div>
         <div class="overflow-x-auto">
@@ -154,7 +154,7 @@
       </div>
     </div>
 
-    <!-- قسم المستودع -->
+    <!-- 2. قسم المستودع -->
     <div id="section-warehouse" class="hidden space-y-6">
       <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
         <h2 class="text-lg font-bold text-gray-800 mb-4 pb-2 border-b">الطلبات الواردة للتحجيم</h2>
@@ -162,6 +162,58 @@
         </div>
       </div>
     </div>
+
+    <!-- 3. قسم الأرشيف الشامل وإدارة التخزين -->
+    <div id="section-archive" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+        <div class="flex justify-between items-center mb-6 flex-wrap gap-4 border-b pb-4">
+          <div>
+            <h2 class="text-xl font-extrabold text-blue-900">📁 الأرشيف الشامل وإدارة السجلات</h2>
+            <p class="text-xs text-gray-500 mt-1">البحث في السجلات، التصدير، وتنظيف المساحة عند الحاجة</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs md:text-sm font-bold px-3 py-2 rounded-lg shadow transition">
+              📊 تصدير الأرشيف (Excel)
+            </button>
+            <button onclick="cleanOldOrders(7)" class="bg-amber-600 hover:bg-amber-700 text-white text-xs md:text-sm font-bold px-3 py-2 rounded-lg shadow transition">
+              🧹 حذف الأقدم من أسبوع
+            </button>
+            <button onclick="cleanOldOrders(30)" class="bg-rose-600 hover:bg-rose-700 text-white text-xs md:text-sm font-bold px-3 py-2 rounded-lg shadow transition">
+              🗑️ حذف الأقدم من شهر
+            </button>
+            <button onclick="exportAndClearAll()" class="bg-red-800 hover:bg-black text-white text-xs md:text-sm font-extrabold px-3 py-2 rounded-lg shadow transition">
+              ⚠️ تصدير وتفريغ كل الأرشيف
+            </button>
+          </div>
+        </div>
+
+        <!-- حقل البحث المباشر -->
+        <div class="mb-4">
+          <input type="text" id="archiveSearchInput" oninput="filterArchive()" placeholder="🔍 ابحث برقم البوليصة، ALV، رقم الطلب، شركة التخليص، أو اسم الموظف..." class="w-full border-2 border-blue-200 rounded-lg p-3 text-sm focus:outline-none focus:border-blue-600 shadow-sm">
+        </div>
+
+        <!-- جدول الأرشيف الشامل -->
+        <div class="overflow-x-auto rounded-lg border border-gray-200">
+          <table class="w-full text-right text-xs md:text-sm">
+            <thead class="bg-blue-900 text-white uppercase text-xs">
+              <tr>
+                <th class="p-3">رقم الطلب والتاريخ</th>
+                <th class="p-3">منشئ الطلب</th>
+                <th class="p-3">البوالص وتفاصيلها</th>
+                <th class="p-3">الوزن الإجمالي</th>
+                <th class="p-3">الأبعاد (L×W×H)</th>
+                <th class="p-3">السيارة</th>
+                <th class="p-3">الحالة والملاحظات</th>
+                <th class="p-3 text-center">إجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="archiveTableBody" class="divide-y divide-gray-200 bg-white">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <script>
@@ -180,6 +232,7 @@
         
         if (dataChanged && !document.activeElement?.matches('input, select, textarea')) {
           renderWarehouse();
+          renderArchive();
         }
       } catch (err) {
         console.error(err);
@@ -205,17 +258,25 @@
     }
 
     function switchTab(tab) {
+      document.getElementById('section-cs').classList.add('hidden');
+      document.getElementById('section-warehouse').classList.add('hidden');
+      document.getElementById('section-archive').classList.add('hidden');
+
+      document.getElementById('tab-cs').className = "py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition";
+      document.getElementById('tab-wh').className = "py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition";
+      document.getElementById('tab-arc').className = "py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition";
+
       if (tab === 'cs') {
         document.getElementById('section-cs').classList.remove('hidden');
-        document.getElementById('section-warehouse').classList.add('hidden');
         document.getElementById('tab-cs').className = "py-3 px-6 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition";
-        document.getElementById('tab-wh').className = "py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition";
-      } else {
-        document.getElementById('section-cs').classList.add('hidden');
+      } else if (tab === 'warehouse') {
         document.getElementById('section-warehouse').classList.remove('hidden');
         document.getElementById('tab-wh').className = "py-3 px-6 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition";
-        document.getElementById('tab-cs').className = "py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition";
         renderWarehouse();
+      } else if (tab === 'archive') {
+        document.getElementById('section-archive').classList.remove('hidden');
+        document.getElementById('tab-arc').className = "py-3 px-6 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition";
+        renderArchive();
       }
     }
 
@@ -281,7 +342,6 @@
       }
     }
 
-    // طباعة الإشعار بخط أكبر وتنسيق واضح
     function printFormalSlip(orderId) {
       let clearanceCompany = '';
       let dateStr = '';
@@ -570,6 +630,80 @@
       loadData();
     }
 
+    function renderArchive(filteredOrders = null) {
+      const tbody = document.getElementById('archiveTableBody');
+      const ordersToDisplay = filteredOrders || state.orders;
+
+      if (ordersToDisplay.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center p-8 text-gray-400 font-bold">لا توجد بيانات مطابقة في الأرشيف</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = ordersToDisplay.map(order => {
+        const blsRows = order.bls.map((b, i) => `
+          <div class="mb-1 pb-1 border-b border-gray-100 last:border-0">
+            <span class="font-bold text-blue-900">${b.blNumber}</span> 
+            | <span class="text-gray-600">ALV: ${b.alvSerial || '-'}</span>
+            | <span class="text-red-600 font-bold">${b.location || '-'}</span>
+            | <span>${b.weight}ط</span>
+            ${b.clearanceCompany ? `| <span class="text-xs text-gray-500 font-semibold">${b.clearanceCompany}</span>` : ''}
+          </div>
+        `).join('');
+
+        const dims = order.measurements?.length 
+          ? `<div class="font-mono text-xs font-bold text-gray-700">${order.measurements.length} × ${order.measurements.width} × ${order.measurements.height} م</div>` 
+          : '<span class="text-gray-400 text-xs">غير محدد</span>';
+
+        const isDone = order.status === 'تم التحجيم';
+
+        return `
+          <tr class="hover:bg-blue-50/50 transition">
+            <td class="p-3">
+              <div class="font-mono font-bold text-blue-900">${order.id}</div>
+              <div class="text-xs text-gray-500">${new Date(order.createdAt).toLocaleDateString('ar-EG')} - ${new Date(order.createdAt).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})}</div>
+            </td>
+            <td class="p-3 font-semibold text-gray-700">${order.createdBy || '-'}</td>
+            <td class="p-3">${blsRows}</td>
+            <td class="p-3 font-bold text-gray-900 whitespace-nowrap">${order.totalWeight} طن</td>
+            <td class="p-3 whitespace-nowrap">${dims}</td>
+            <td class="p-3 font-bold text-indigo-700 whitespace-nowrap">${order.vehicleType || '-'}</td>
+            <td class="p-3">
+              <span class="px-2 py-0.5 rounded-full text-xs font-bold ${isDone ? 'badge-done' : 'badge-tahjeem'}">${order.status}</span>
+              ${order.shareefNotes ? `<div class="text-xs text-gray-500 mt-1 italic max-w-xs">📝 ${order.shareefNotes}</div>` : ''}
+            </td>
+            <td class="p-3 text-center whitespace-nowrap">
+              <button onclick="printFormalSlip('${order.id}')" class="bg-gray-800 hover:bg-black text-white px-2.5 py-1 rounded text-xs font-semibold shadow">🖨️ طباعة</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterArchive() {
+      const query = document.getElementById('archiveSearchInput').value.trim().toLowerCase();
+      if (!query) {
+        renderArchive();
+        return;
+      }
+
+      const filtered = state.orders.filter(order => {
+        const idMatch = order.id.toLowerCase().includes(query);
+        const creatorMatch = (order.createdBy || '').toLowerCase().includes(query);
+        const vehMatch = (order.vehicleType || '').toLowerCase().includes(query);
+        const notesMatch = (order.shareefNotes || '').toLowerCase().includes(query);
+        const blMatch = order.bls.some(b => 
+          (b.blNumber || '').toLowerCase().includes(query) ||
+          (b.alvSerial || '').toLowerCase().includes(query) ||
+          (b.location || '').toLowerCase().includes(query) ||
+          (b.clearanceCompany || '').toLowerCase().includes(query)
+        );
+
+        return idMatch || creatorMatch || vehMatch || notesMatch || blMatch;
+      });
+
+      renderArchive(filtered);
+    }
+
     function exportToExcel() {
       const data = [];
       state.orders.forEach(o => {
@@ -577,6 +711,7 @@
           data.push({
             'رقم الطلب': o.id,
             'التاريخ': new Date(o.createdAt).toLocaleDateString('ar-EG'),
+            'الوقت': new Date(o.createdAt).toLocaleTimeString('ar-EG'),
             'منشئ الطلب': o.createdBy,
             'الحالة': o.status,
             'نوع السيارة': o.vehicleType || '-',
@@ -588,23 +723,35 @@
             'البلتات': b.pallets,
             'الموقع': b.location,
             'شركة التخليص': b.clearanceCompany,
-            'الطول': o.measurements?.length || '-',
-            'العرض': o.measurements?.width || '-',
-            'الارتفاع': o.measurements?.height || '-',
+            'الطول (م)': o.measurements?.length || '-',
+            'العرض (م)': o.measurements?.width || '-',
+            'الارتفاع (م)': o.measurements?.height || '-',
             'ملاحظات موظف التحجيم': o.shareefNotes || '-'
           });
         });
       });
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "الطلبات");
-      XLSX.writeFile(wb, `طلبات_التحجيم_${new Date().toISOString().slice(0,10)}.xlsx`);
+      XLSX.utils.book_append_sheet(wb, ws, "أرشيف الطلبات");
+      XLSX.writeFile(wb, `ارشيف_طلبات_التحجيم_${new Date().toISOString().slice(0,10)}.xlsx`);
     }
 
-    async function deleteOldOrders() {
-      if (!confirm('هل أنت متأكد من حذف الطلبات الأقدم من أسبوع؟')) return;
-      await fetch('/api/orders/old', { method: 'DELETE' });
+    async function cleanOldOrders(days) {
+      const label = days === 7 ? 'أسبوع' : 'شهر';
+      if (!confirm(`هل أنت متأكد من حذف الطلبات الأقدم من ${label} لتفريغ المساحة؟\n(يُفضل تصدير نسخة Excel أولاً)`)) return;
+      await fetch(`/api/orders/clean?days=${days}`, { method: 'DELETE' });
       loadData();
+      alert(`تم تنظيف الأرشيف وحذف الطلبات الأقدم من ${label} بنجاح ✅`);
+    }
+
+    async function exportAndClearAll() {
+      if (!confirm('⚠️ تحذير: سيتم أولاً تحميل ملف إكسل بكامل السجلات، ثم تفريغ الأرشيف بالكامل من قاعدة البيانات لتوفير المساحة.\nهل ترغب بالمتابعة؟')) return;
+      exportToExcel();
+      setTimeout(async () => {
+        await fetch('/api/orders/clear-all', { method: 'DELETE' });
+        loadData();
+        alert('تم تصدير البيانات وتفريغ قاعدة البيانات بالكامل بنجاح 🚀');
+      }, 1500);
     }
 
     setInterval(loadData, 3000);
