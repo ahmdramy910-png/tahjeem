@@ -33,7 +33,7 @@
   <div class="max-w-7xl mx-auto px-4 py-6">
     <div class="flex border-b border-gray-300 mb-6 bg-white rounded-t-lg px-4 pt-2 shadow-sm">
       <button onclick="switchTab('cs')" id="tab-cs" class="py-3 px-6 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition">قسم خدمة العملاء (Customer Service)</button>
-      <button onclick="switchTab('warehouse')" id="tab-wh" class="py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition">شاشة المستودع (شريف - التحجيم)</button>
+      <button onclick="switchTab('warehouse')" id="tab-wh" class="py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition">شاشة المستودع (موظف التحجيم)</button>
     </div>
 
     <!-- قسم خدمة العملاء -->
@@ -120,7 +120,7 @@
               <span>🖨️ طباعة إشعار يدوي (احتياطي)</span>
             </button>
             <button onclick="submitOrder()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-6 rounded-lg shadow-md transition transform active:scale-95 flex items-center gap-2">
-              <span>🚀 إرسال لشريف بالمستودع</span>
+              <span>🚀 إرسال لموظف التحجيم</span>
             </button>
           </div>
         </div>
@@ -449,7 +449,7 @@
       }
       calcTotalWeight();
       loadData();
-      alert('تم إرسال الطلب لشريف بالمستودع بنجاح 🚀');
+      alert('تم إرسال الطلب لموظف التحجيم بنجاح 🚀');
     }
 
     function renderOrders() {
@@ -591,7 +591,7 @@
             'الطول': o.measurements?.length || '-',
             'العرض': o.measurements?.width || '-',
             'الارتفاع': o.measurements?.height || '-',
-            'ملاحظات شريف': o.shareefNotes || '-'
+            'ملاحظات موظف التحجيم': o.shareefNotes || '-'
           });
         });
       });
