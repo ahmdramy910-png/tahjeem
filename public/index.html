@@ -281,7 +281,7 @@
       }
     }
 
-    // الدالة الموحدة للطباعة بالنموذج الرسمي المطابق للورقة
+    // طباعة الإشعار بخط أكبر وتنسيق واضح
     function printFormalSlip(orderId) {
       let clearanceCompany = '';
       let dateStr = '';
@@ -292,7 +292,6 @@
       let notes = '';
 
       if (orderId) {
-        // طباعة طلب مكتمل
         const order = state.orders.find(o => o.id === orderId);
         if (!order) return;
         clearanceCompany = order.bls.find(b => b.clearanceCompany)?.clearanceCompany || '';
@@ -305,7 +304,6 @@
         selectedVeh = order.vehicleType || '';
         notes = order.shareefNotes || '';
       } else {
-        // طباعة يدوية احتياطية قبل الإرسال
         bls = getFilledBLs();
         if (bls.length === 0) {
           alert('يرجى إدخال أو قراءة بوليصة واحدة على الأقل للطباعة');
@@ -318,24 +316,25 @@
 
       const getCheck = (name) => (selectedVeh === name ? '☑' : '☐');
 
-      const printWindow = window.open('', '', 'width=900,height=750');
+      const printWindow = window.open('', '', 'width=950,height=800');
       printWindow.document.write(`
         <html dir="rtl">
         <head>
           <title>خدمة تحجيم - Aqaba Logistics Village</title>
           <style>
-            @page { size: A4 portrait; margin: 15mm; }
-            body { font-family: 'Cairo', Tahoma, Arial, sans-serif; padding: 10px; color: #000; line-height: 1.4; font-size: 14px; }
-            .header-title { text-align: center; font-size: 20px; font-weight: bold; margin-bottom: 4px; }
-            .sub-title { text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 20px; }
-            .top-info { display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 15px; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            th, td { border: 1.5px solid #000; padding: 8px 6px; text-align: center; font-size: 13px; }
-            th { background-color: #f3f3f3; font-weight: bold; }
-            .section-line { margin: 12px 0; font-size: 14px; }
-            .dim-container { margin-top: 15px; }
-            .dim-grid { display: flex; gap: 30px; margin-top: 8px; font-size: 14px; }
-            .notes-box { min-height: 50px; border-bottom: 1px dashed #777; margin-top: 5px; }
+            @page { size: A4 portrait; margin: 12mm; }
+            body { font-family: 'Cairo', Tahoma, Arial, sans-serif; padding: 10px; color: #000; line-height: 1.5; font-size: 16px; }
+            .header-title { text-align: center; font-size: 24px; font-weight: 800; margin-bottom: 2px; }
+            .sub-title { text-align: center; font-size: 20px; font-weight: 700; margin-bottom: 22px; }
+            .top-info { display: flex; justify-content: space-between; margin-bottom: 18px; font-size: 17px; font-weight: 600; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 22px; }
+            th, td { border: 2px solid #000; padding: 10px 6px; text-align: center; font-size: 16px; }
+            th { background-color: #f2f2f2; font-weight: 800; font-size: 16px; }
+            .section-weight { margin: 18px 0; font-size: 20px; font-weight: 800; }
+            .section-line { margin: 16px 0; font-size: 16px; font-weight: 600; }
+            .dim-container { margin-top: 18px; }
+            .dim-grid { display: flex; gap: 35px; margin-top: 10px; font-size: 17px; font-weight: 700; }
+            .notes-box { min-height: 55px; border-bottom: 1.5px dashed #444; margin-top: 6px; font-size: 16px; padding-top: 4px; }
           </style>
         </head>
         <body>
@@ -350,13 +349,13 @@
           <table>
             <thead>
               <tr>
-                <th style="width: 22%;"></th>
-                <th style="width: 20%;">رقم البوليصة</th>
+                <th style="width: 20%;"></th>
+                <th style="width: 22%;">رقم البوليصة</th>
                 <th style="width: 14%;">ALV</th>
-                <th style="width: 12%;">الوزن/طن</th>
+                <th style="width: 13%;">الوزن/طن</th>
                 <th style="width: 10%;">العدد</th>
                 <th style="width: 10%;">عدد البلتات</th>
-                <th style="width: 12%;">موقع التخزين</th>
+                <th style="width: 11%;">موقع التخزين</th>
               </tr>
             </thead>
             <tbody>
@@ -364,37 +363,37 @@
                 <td><b>البوليصة (1):</b></td>
                 <td><b>${bls[0]?.blNumber || ''}</b></td>
                 <td>${bls[0]?.alvSerial || ''}</td>
-                <td>${bls[0]?.weight || ''}</td>
+                <td><b>${bls[0]?.weight || ''}</b></td>
                 <td>${bls[0]?.qty || ''}</td>
                 <td>${bls[0]?.pallets || ''}</td>
-                <td style="font-weight:bold; font-size: 15px;">${bls[0]?.location || ''}</td>
+                <td style="font-weight: 800; font-size: 18px;">${bls[0]?.location || ''}</td>
               </tr>
               <tr>
                 <td><b>البوليصة (2):</b></td>
                 <td><b>${bls[1]?.blNumber || ''}</b></td>
                 <td>${bls[1]?.alvSerial || ''}</td>
-                <td>${bls[1]?.weight || ''}</td>
+                <td><b>${bls[1]?.weight || ''}</b></td>
                 <td>${bls[1]?.qty || ''}</td>
                 <td>${bls[1]?.pallets || ''}</td>
-                <td style="font-weight:bold; font-size: 15px;">${bls[1]?.location || ''}</td>
+                <td style="font-weight: 800; font-size: 18px;">${bls[1]?.location || ''}</td>
               </tr>
               <tr>
                 <td><b>البوليصة (3):</b></td>
                 <td><b>${bls[2]?.blNumber || ''}</b></td>
                 <td>${bls[2]?.alvSerial || ''}</td>
-                <td>${bls[2]?.weight || ''}</td>
+                <td><b>${bls[2]?.weight || ''}</b></td>
                 <td>${bls[2]?.qty || ''}</td>
                 <td>${bls[2]?.pallets || ''}</td>
-                <td style="font-weight:bold; font-size: 15px;">${bls[2]?.location || ''}</td>
+                <td style="font-weight: 800; font-size: 18px;">${bls[2]?.location || ''}</td>
               </tr>
             </tbody>
           </table>
 
-          <div class="section-line">
-            <b>الوزن الكلي (طن):</b> &nbsp;&nbsp;&nbsp; <u>&nbsp;${totalWeight ? totalWeight + ' طن' : '___________________'}&nbsp;</u>
+          <div class="section-weight">
+            الوزن الكلي (طن): &nbsp;&nbsp;&nbsp; <u style="font-size: 22px;">&nbsp;${totalWeight ? totalWeight + ' طن' : '___________________'}&nbsp;</u>
           </div>
 
-          <div class="section-line" style="margin-top: 15px;">
+          <div class="section-line" style="margin-top: 18px;">
             <b>نوع السيارة (يحددها موظف التحجيم):</b> &nbsp;&nbsp;&nbsp;
             ${getCheck('ديانا')} ديانا &nbsp;&nbsp;&nbsp;&nbsp;
             ${getCheck('بنقو')} بنقو &nbsp;&nbsp;&nbsp;&nbsp;
@@ -404,7 +403,7 @@
           </div>
 
           <div class="dim-container">
-            <div style="font-weight: bold; margin-bottom: 6px;">أبعاد الشحنة كاملة (م):</div>
+            <div style="font-weight: 800; font-size: 17px; margin-bottom: 6px;">أبعاد الشحنة كاملة (م):</div>
             <div class="dim-grid">
               <div>الطول: <u>&nbsp;${l ? l + ' م' : '___________'}&nbsp;</u></div>
               <div>العرض: <u>&nbsp;${w ? w + ' م' : '___________'}&nbsp;</u></div>
@@ -412,8 +411,8 @@
             </div>
           </div>
 
-          <div style="margin-top: 20px;">
-            <b>ملاحظات (موظف التحجيم):</b>
+          <div style="margin-top: 22px;">
+            <b style="font-size: 16px;">ملاحظات (موظف التحجيم):</b>
             <div class="notes-box">${notes}</div>
           </div>
 
