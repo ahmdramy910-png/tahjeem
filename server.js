@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
-const fs = require('fs');
+const mongoose = require('mongoose');
 const path = require('path');
 require('dotenv').config();
 
@@ -12,42 +12,85 @@ app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use(express.static('public'));
 
-const DB_FILE = path.join(__dirname, 'db.json');
+// --- Database Connection (Cloud MongoDB with Memory Fallback) ---
+const MONGODB_URI = process.env.MONGODB_URI;
 
-function loadDB() {
-  if (!fs.existsSync(DB_FILE)) {
-    const initialData = {
-      employees: ['كستمر سيرفس 1', 'شريف (المستودع)'],
-      orders: []
-    };
-    fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2));
-    return initialData;
+const AppStateSchema = new mongoose.Schema({
+  key: { type: String, default: 'main_state', unique: true },
+  employees: { type: [String], default: ['كستمر سيرفس 1', 'موظف التحجيم 1'] },
+  orders: { type: Array, default: [] }
+}, { timestamps: true });
+
+const AppState = mongoose.model('AppState', AppStateSchema);
+
+let memoryState = {
+  employees: ['كستمر سيرفس 1', 'موظف التحجيم 1'],
+  orders: []
+};
+
+let isConnectedToMongo = false;
+
+if (MONGODB_URI) {
+  mongoose.connect(MONGODB_URI)
+    .then(async () => {
+      isConnectedToMongo = true;
+      console.log('✅ Connected permanently to MongoDB Atlas');
+      const doc = await AppState.findOne({ key: 'main_state' });
+      if (!doc) {
+        await AppState.create({ key: 'main_state', ...memoryState });
+      }
+    })
+    .catch(err => {
+      console.error('⚠️ MongoDB connection error, running in memory mode:', err.message);
+    });
+}
+
+async function loadDB() {
+  if (isConnectedToMongo) {
+    try {
+      const doc = await AppState.findOne({ key: 'main_state' });
+      if (doc) return { employees: doc.employees, orders: doc.orders };
+    } catch (err) {
+      console.error('Error loading from DB:', err);
+    }
   }
-  return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+  return memoryState;
 }
 
-function saveDB(data) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+async function saveDB(data) {
+  memoryState = data;
+  if (isConnectedToMongo) {
+    try {
+      await AppState.findOneAndUpdate(
+        { key: 'main_state' },
+        { employees: data.employees, orders: data.orders },
+        { upsert: true }
+      );
+    } catch (err) {
+      console.error('Error saving to DB:', err);
+    }
+  }
 }
 
-// 1. جلب البيانات
-app.get('/api/data', (req, res) => {
-  res.json(loadDB());
+// 1. Fetch All Data
+app.get('/api/data', async (req, res) => {
+  const data = await loadDB();
+  res.json(data);
 });
 
-// 2. إضافة موظف
-app.post('/api/employees', (req, res) => {
+// 2. Add Employee
+app.post('/api/employees', async (req, res) => {
   const { name } = req.body;
   if (!name) return res.status(400).json({ error: 'الاسم مطلوب' });
-  const db = loadDB();
+  const db = await loadDB();
   if (!db.employees.includes(name)) {
     db.employees.push(name);
-    saveDB(db);
+    await saveDB(db);
   }
   res.json({ employees: db.employees });
 });
 
-// 3. تحليل السكرين شوت عبر OpenRouter (مجاني ومستقر)
+// 3. OCR Processing via OpenRouter
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -109,7 +152,6 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
     }
 
     let rawContent = data.choices?.[0]?.message?.content || '{}';
-    // تنظيف أي زوائد markdown إن وجدت
     rawContent = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
     const parsed = JSON.parse(rawContent);
     return res.json(parsed);
@@ -120,9 +162,9 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
   }
 });
 
-// 4. إنشاء طلب جديد
-app.post('/api/orders', (req, res) => {
-  const db = loadDB();
+// 4. Create Order
+app.post('/api/orders', async (req, res) => {
+  const db = await loadDB();
   const newOrder = {
     id: 'ORD-' + Math.floor(100000 + Math.random() * 900000),
     createdAt: new Date().toISOString(),
@@ -136,13 +178,13 @@ app.post('/api/orders', (req, res) => {
     completedAt: null
   };
   db.orders.unshift(newOrder);
-  saveDB(db);
+  await saveDB(db);
   res.json(newOrder);
 });
 
-// 5. حفظ واعتماد التحجيم من شريف
-app.patch('/api/orders/:id/tahjeem', (req, res) => {
-  const db = loadDB();
+// 5. Update Tahjeem Status
+app.patch('/api/orders/:id/tahjeem', async (req, res) => {
+  const db = await loadDB();
   const order = db.orders.find(o => o.id === req.params.id);
   if (!order) return res.status(404).json({ error: 'الطلب غير موجود' });
 
@@ -152,16 +194,16 @@ app.patch('/api/orders/:id/tahjeem', (req, res) => {
   order.status = 'تم التحجيم';
   order.completedAt = new Date().toISOString();
 
-  saveDB(db);
+  await saveDB(db);
   res.json(order);
 });
 
-// 6. حذف الطلبات القديمة (أسبوع فما فوق)
-app.delete('/api/orders/old', (req, res) => {
-  const db = loadDB();
+// 6. Delete Orders Older Than One Week
+app.delete('/api/orders/old', async (req, res) => {
+  const db = await loadDB();
   const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   db.orders = db.orders.filter(o => new Date(o.createdAt) >= oneWeekAgo);
-  saveDB(db);
+  await saveDB(db);
   res.json({ success: true, count: db.orders.length });
 });
 
