@@ -12,7 +12,7 @@ app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use(express.static('public'));
 
-// --- Database Connection (Cloud MongoDB with Memory Fallback) ---
+// --- الاتصال بقاعدة البيانات السحابية MongoDB Atlas ---
 const MONGODB_URI = process.env.MONGODB_URI;
 
 const AppStateSchema = new mongoose.Schema({
@@ -72,13 +72,13 @@ async function saveDB(data) {
   }
 }
 
-// 1. Fetch All Data
+// 1. جلب البيانات
 app.get('/api/data', async (req, res) => {
   const data = await loadDB();
   res.json(data);
 });
 
-// 2. Add Employee
+// 2. إضافة موظف
 app.post('/api/employees', async (req, res) => {
   const { name } = req.body;
   if (!name) return res.status(400).json({ error: 'الاسم مطلوب' });
@@ -90,7 +90,7 @@ app.post('/api/employees', async (req, res) => {
   res.json({ employees: db.employees });
 });
 
-// 3. OCR Processing via OpenRouter
+// 3. تحليل السكرين شوت بالذكاء الاصطناعي
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -162,7 +162,7 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
   }
 });
 
-// 4. Create Order
+// 4. إنشاء طلب جديد
 app.post('/api/orders', async (req, res) => {
   const db = await loadDB();
   const newOrder = {
@@ -182,7 +182,7 @@ app.post('/api/orders', async (req, res) => {
   res.json(newOrder);
 });
 
-// 5. Update Tahjeem Status
+// 5. حفظ واعتماد التحجيم
 app.patch('/api/orders/:id/tahjeem', async (req, res) => {
   const db = await loadDB();
   const order = db.orders.find(o => o.id === req.params.id);
@@ -198,13 +198,22 @@ app.patch('/api/orders/:id/tahjeem', async (req, res) => {
   res.json(order);
 });
 
-// 6. Delete Orders Older Than One Week
-app.delete('/api/orders/old', async (req, res) => {
+// 6. حذف الطلبات حسب عدد الأيام (تنظيف المساحة)
+app.delete('/api/orders/clean', async (req, res) => {
+  const days = parseInt(req.query.days) || 7;
   const db = await loadDB();
-  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  db.orders = db.orders.filter(o => new Date(o.createdAt) >= oneWeekAgo);
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  db.orders = db.orders.filter(o => new Date(o.createdAt) >= cutoff);
   await saveDB(db);
   res.json({ success: true, count: db.orders.length });
+});
+
+// 7. تفريغ كامل الأرشيف (تصفير المساحة بعد التصدير)
+app.delete('/api/orders/clear-all', async (req, res) => {
+  const db = await loadDB();
+  db.orders = [];
+  await saveDB(db);
+  res.json({ success: true, message: 'تم تفريغ الأرشيف بالكامل' });
 });
 
 const PORT = process.env.PORT || 10000;
