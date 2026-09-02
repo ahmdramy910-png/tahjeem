@@ -90,73 +90,61 @@ app.post('/api/employees', async (req, res) => {
   res.json({ employees: db.employees });
 });
 
-// 3. تحليل السكرين شوت بالذكاء الاصطناعي (مصحح ومجاني 100%)
+// 3. تحليل السكرين شوت فائق السرعة عبر Gemini Flash (1 - 2 ثانية فقط)
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'لم يتم استلام ملف صورة' });
     }
 
-    const openrouterKey = process.env.OPENROUTER_API_KEY;
-    if (!openrouterKey) {
-      return res.status(500).json({ error: 'مفتاح OPENROUTER_API_KEY غير معرف في Render' });
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (!geminiKey) {
+      return res.status(500).json({ error: 'مفتاح GEMINI_API_KEY غير معرف في Render' });
     }
 
     const base64Image = req.file.buffer.toString('base64');
     const mimeType = req.file.mimetype || 'image/jpeg';
-    const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
-    const prompt = `Extract these exact fields from the logistics Sage CRM screenshot:
-- B/L No. (blNumber)
-- ALV Serial (alvSerial)
-- QTY (qty)
-- Weight(Ton) (weight: round UP to nearest 0.1 step, e.g. 1.611 becomes 1.7)
-- ALV Pallet (pallets)
-- Warehouse location code from bottom table (location)
-- Clearance company name (clearanceCompany)
+    const prompt = `Extract these fields from this Sage CRM LCL window screenshot into raw JSON only:
+{
+  "blNumber": "B/L No.",
+  "alvSerial": "ALV Serial",
+  "qty": "QTY as integer",
+  "weight": "Weight(Ton) rounded UP to nearest 0.1 (e.g. 1.611 -> 1.7)",
+  "pallets": "ALV Pallet count",
+  "location": "Most frequent storage location from bottom table",
+  "clearanceCompany": "Company clearance name"
+}
+Return valid raw JSON only. Do not wrap in markdown backticks.`;
 
-Output JSON only in this format:
-{"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openrouterKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://tahjeem.onrender.com',
-        'X-Title': 'Tahjeem Logistics'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'minimax/minimax-m3:free',
-        models: [
-          'minimax/minimax-m3:free',
-          'openrouter/free'
-        ],
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: prompt },
-              { type: 'image_url', image_url: { url: dataUrl } }
-            ]
-          }
-        ],
-        temperature: 0.1
+        contents: [{
+          parts: [
+            { text: prompt },
+            { inline_data: { mime_type: mimeType, data: base64Image } }
+          ]
+        }],
+        generationConfig: {
+          response_mime_type: 'application/json',
+          temperature: 0.1
+        }
       })
     });
 
     const data = await response.json();
 
-    if (!response.ok) {
-      console.error('OpenRouter Error:', data);
-      return res.status(500).json({ error: data.error?.message || 'خطأ من مزود الذكاء الاصطناعي' });
+    if (data.error) {
+      console.error('Gemini API Error:', data.error);
+      return res.status(500).json({ error: data.error.message });
     }
 
-    let raw = data.choices?.[0]?.message?.content || '{}';
-    // استخراج الـ JSON بدقة حتى لو كتب الموديل أي كلام قبله أو بعده
-    const match = raw.match(/\{[\s\S]*\}/);
-    const jsonStr = match ? match[0] : '{}';
-    const parsed = JSON.parse(jsonStr);
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    const parsed = JSON.parse(rawText);
 
     return res.json(parsed);
 
