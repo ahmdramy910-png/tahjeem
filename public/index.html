@@ -1,15 +1,14 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tahjeem ALV - Aqaba Logistics Village</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;600;700;800;900&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Cairo:wght@600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Cairo', sans-serif; }
-    .font-en { font-family: 'Inter', sans-serif; }
+    body { font-family: 'Inter', sans-serif; }
     .badge-tahjeem { background-color: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
     .badge-done { background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
     .badge-manual { background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
@@ -17,19 +16,19 @@
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen">
 
-  <!-- شاشة الدخول الاحترافية (Tahjeem ALV) -->
+  <!-- Sign In / Register Overlay (LTR English Interface) -->
   <div id="loginOverlay" class="fixed inset-0 bg-slate-900 bg-opacity-95 z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full border border-slate-200 text-center space-y-5">
       
       <div class="space-y-1">
-        <div class="w-16 h-16 bg-blue-900 text-white rounded-2xl flex items-center justify-center mx-auto text-2xl font-black font-en shadow-lg tracking-wider">
+        <div class="w-16 h-16 bg-blue-900 text-white rounded-2xl flex items-center justify-center mx-auto text-2xl font-black shadow-lg tracking-wider">
           ALV
         </div>
-        <h2 class="text-2xl font-black text-blue-950 pt-2 font-en tracking-tight">Tahjeem ALV</h2>
-        <p class="text-xs text-slate-500 font-semibold font-en">Aqaba Logistics Village • LCL Operations</p>
+        <h2 class="text-2xl font-black text-blue-950 pt-2 tracking-tight">Tahjeem ALV</h2>
+        <p class="text-xs text-slate-500 font-semibold">Aqaba Logistics Village • LCL Operations</p>
       </div>
 
-      <div class="grid grid-cols-2 p-1 bg-slate-100 rounded-xl text-xs sm:text-sm font-bold font-en">
+      <div class="grid grid-cols-2 p-1 bg-slate-100 rounded-xl text-xs sm:text-sm font-bold">
         <button id="btnAuthLogin" onclick="switchAuthMode('login')" class="py-2 rounded-lg bg-blue-900 text-white shadow transition">
           Sign In
         </button>
@@ -38,102 +37,102 @@
         </button>
       </div>
 
-      <!-- Sign In -->
-      <div id="formLogin" class="space-y-4 text-right">
+      <!-- Sign In Form -->
+      <div id="formLogin" class="space-y-4 text-left">
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Select User:</label>
-          <select id="loginUserSelect" class="w-full border-2 border-slate-200 rounded-xl p-3 text-sm font-bold focus:border-blue-700 focus:outline-none bg-slate-50 font-en">
-            <option value="">-- Select User / اختر الموظف --</option>
+          <select id="loginUserSelect" class="w-full border-2 border-slate-200 rounded-xl p-3 text-sm font-bold focus:border-blue-700 focus:outline-none bg-slate-50">
+            <option value="">-- Select Employee Name --</option>
           </select>
         </div>
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Password (8+ chars):</label>
-          <input type="password" id="loginPassword" placeholder="••••••••" class="w-full border-2 border-slate-200 rounded-xl p-3 text-sm focus:border-blue-700 focus:outline-none font-en">
+          <label class="block text-xs font-bold text-slate-700 mb-1">Password:</label>
+          <input type="password" id="loginPassword" placeholder="••••••••" class="w-full border-2 border-slate-200 rounded-xl p-3 text-sm focus:border-blue-700 focus:outline-none">
         </div>
-        <button onclick="performLogin()" class="w-full bg-blue-900 hover:bg-blue-800 text-white font-bold py-3 rounded-xl shadow-md transition transform active:scale-95 font-en text-sm">
+        <button onclick="performLogin()" class="w-full bg-blue-900 hover:bg-blue-800 text-white font-bold py-3 rounded-xl shadow-md transition transform active:scale-95 text-sm">
           Access System 🔒
         </button>
       </div>
 
-      <!-- New Account -->
-      <div id="formRegister" class="space-y-3 text-right hidden">
+      <!-- New Account Form -->
+      <div id="formRegister" class="space-y-3 text-left hidden">
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Employee Full Name:</label>
-          <input type="text" id="regName" placeholder="e.g. Ahmad Rami" class="w-full border-2 border-slate-200 rounded-xl p-2.5 text-sm focus:border-blue-700 focus:outline-none font-en">
+          <input type="text" id="regName" placeholder="e.g. Ahmad Rami" class="w-full border-2 border-slate-200 rounded-xl p-2.5 text-sm focus:border-blue-700 focus:outline-none">
         </div>
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Role / Department:</label>
-          <select id="regRole" class="w-full border-2 border-slate-200 rounded-xl p-2.5 text-sm font-bold bg-slate-50 font-en">
+          <label class="block text-xs font-bold text-slate-700 mb-1">Department / Role:</label>
+          <select id="regRole" class="w-full border-2 border-slate-200 rounded-xl p-2.5 text-sm font-bold bg-slate-50">
             <option value="cs">Customer Service (CS)</option>
             <option value="warehouse">Warehouse (Tahjeem)</option>
           </select>
         </div>
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Password (8 chars min):</label>
-          <input type="password" id="regPassword" placeholder="Minimum 8 characters" class="w-full border-2 border-slate-200 rounded-xl p-2.5 text-sm focus:border-blue-700 focus:outline-none font-en">
+          <label class="block text-xs font-bold text-slate-700 mb-1">Password (8+ chars):</label>
+          <input type="password" id="regPassword" placeholder="Minimum 8 characters" class="w-full border-2 border-slate-200 rounded-xl p-2.5 text-sm focus:border-blue-700 focus:outline-none">
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Confirm Password:</label>
-          <input type="password" id="regPasswordConfirm" placeholder="Re-enter password" class="w-full border-2 border-slate-200 rounded-xl p-2.5 text-sm focus:border-blue-700 focus:outline-none font-en">
+          <input type="password" id="regPasswordConfirm" placeholder="Re-enter password" class="w-full border-2 border-slate-200 rounded-xl p-2.5 text-sm focus:border-blue-700 focus:outline-none">
         </div>
-        <button onclick="performRegister()" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 rounded-xl shadow-md transition transform active:scale-95 font-en text-sm">
+        <button onclick="performRegister()" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 rounded-xl shadow-md transition transform active:scale-95 text-sm">
           Create Account & Log In 🚀
         </button>
       </div>
 
-      <div id="authError" class="text-rose-600 text-xs font-bold hidden bg-rose-50 p-2.5 rounded-lg border border-rose-200 font-en"></div>
+      <div id="authError" class="text-rose-600 text-xs font-bold hidden bg-rose-50 p-2.5 rounded-lg border border-rose-200"></div>
 
-      <div class="pt-2 text-[11px] text-slate-400 border-t font-en">
+      <div class="pt-2 text-[11px] text-slate-400 border-t">
         Tahjeem ALV Digital Platform © 2026
       </div>
     </div>
   </div>
 
-  <!-- لوحة العمليات الداخلية -->
+  <!-- Main System App (LTR) -->
   <div id="mainApp" class="hidden">
     <nav class="bg-blue-900 text-white shadow-md sticky top-0 z-40">
       <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
-        <div class="flex items-center space-x-3 space-x-reverse">
-          <span class="text-xl font-black bg-blue-800 px-2.5 py-1 rounded-lg font-en tracking-wider">ALV</span>
+        <div class="flex items-center space-x-3">
+          <span class="text-xl font-black bg-blue-800 px-2.5 py-1 rounded-lg tracking-wider">ALV</span>
           <div>
-            <h1 class="text-lg font-black leading-none font-en tracking-wide">Tahjeem ALV</h1>
-            <span class="text-[11px] text-blue-200 font-en">Aqaba Logistics Village</span>
+            <h1 class="text-lg font-black leading-none tracking-wide">Tahjeem ALV</h1>
+            <span class="text-[11px] text-blue-200">Aqaba Logistics Village</span>
           </div>
         </div>
-        <div class="flex items-center space-x-4 space-x-reverse text-sm">
-          <div class="bg-blue-800 px-3 py-1.5 rounded-lg flex items-center gap-2 border border-blue-700 font-en">
+        <div class="flex items-center space-x-4 text-sm">
+          <div class="bg-blue-800 px-3 py-1.5 rounded-lg flex items-center gap-2 border border-blue-700">
             <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
             <span id="navUserName" class="font-bold text-white">-</span>
             <span id="navUserRole" class="text-[11px] text-blue-200 bg-blue-950 px-2 py-0.5 rounded font-semibold uppercase tracking-wider">-</span>
           </div>
-          <button onclick="logout()" class="bg-rose-700 hover:bg-rose-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition font-en">Logout</button>
+          <button onclick="logout()" class="bg-rose-700 hover:bg-rose-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">Logout</button>
         </div>
       </div>
     </nav>
 
     <div class="max-w-7xl mx-auto px-4 py-6">
-      <!-- التبويبات الرئيسية -->
-      <div class="flex border-b border-slate-300 mb-6 bg-white rounded-t-xl px-4 pt-2 shadow-sm flex-wrap gap-2 font-en text-sm">
+      <!-- Navigation Tabs -->
+      <div class="flex border-b border-slate-300 mb-6 bg-white rounded-t-xl px-4 pt-2 shadow-sm flex-wrap gap-2 text-sm">
         <button onclick="switchTab('cs')" id="tab-cs" class="py-3 px-5 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition">Customer Service</button>
         <button onclick="switchTab('warehouse')" id="tab-wh" class="py-3 px-5 font-bold text-slate-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition">Warehouse</button>
         <button onclick="switchTab('stats')" id="tab-stats" class="py-3 px-5 font-bold text-slate-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition">KPIs & Stats</button>
         <button onclick="switchTab('archive')" id="tab-arc" class="py-3 px-5 font-bold text-slate-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition">Archive & Data</button>
       </div>
 
-      <!-- 1. Customer Service -->
+      <!-- 1. Customer Service Section -->
       <div id="section-cs" class="space-y-6">
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           <div class="flex justify-between items-center mb-4 pb-2 border-b">
-            <h2 class="text-base font-extrabold text-blue-950 font-en">New Shipment Order (Max 3 B/Ls)</h2>
-            <span class="text-xs text-slate-400 font-en">Trip / Car Order</span>
+            <h2 class="text-base font-extrabold text-blue-950">New Shipment Order (Max 3 B/Ls)</h2>
+            <span class="text-xs text-slate-400">1 Trip / Vehicle Order</span>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="bls-container">
             <!-- B/L 1 -->
-            <div class="border border-blue-100 p-4 rounded-xl bg-blue-50/40 relative space-y-2.5">
+            <div class="border border-blue-100 p-4 rounded-xl bg-blue-50/40 relative space-y-2.5 text-left">
               <div class="flex justify-between items-center mb-1">
-                <span class="font-extrabold text-blue-900 font-en">B/L (1)</span>
-                <label class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-2.5 py-1 rounded-lg cursor-pointer transition shadow-sm font-bold inline-flex items-center gap-1 font-en" id="btn-ocr-0" title="Upload Screenshot">
+                <span class="font-extrabold text-blue-900">B/L (1)</span>
+                <label class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-2.5 py-1 rounded-lg cursor-pointer transition shadow-sm font-bold inline-flex items-center gap-1" id="btn-ocr-0" title="Upload Screenshot">
                   <span>📷</span>
                   <input type="file" accept="image/*" class="hidden" onchange="handleOCR(event, 0)">
                 </label>
@@ -150,10 +149,10 @@
             </div>
 
             <!-- B/L 2 -->
-            <div class="border border-blue-100 p-4 rounded-xl bg-blue-50/40 relative space-y-2.5">
+            <div class="border border-blue-100 p-4 rounded-xl bg-blue-50/40 relative space-y-2.5 text-left">
               <div class="flex justify-between items-center mb-1">
-                <span class="font-extrabold text-blue-900 font-en">B/L (2)</span>
-                <label class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-2.5 py-1 rounded-lg cursor-pointer transition shadow-sm font-bold inline-flex items-center gap-1 font-en" id="btn-ocr-1" title="Upload Screenshot">
+                <span class="font-extrabold text-blue-900">B/L (2)</span>
+                <label class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-2.5 py-1 rounded-lg cursor-pointer transition shadow-sm font-bold inline-flex items-center gap-1" id="btn-ocr-1" title="Upload Screenshot">
                   <span>📷</span>
                   <input type="file" accept="image/*" class="hidden" onchange="handleOCR(event, 1)">
                 </label>
@@ -170,10 +169,10 @@
             </div>
 
             <!-- B/L 3 -->
-            <div class="border border-blue-100 p-4 rounded-xl bg-blue-50/40 relative space-y-2.5">
+            <div class="border border-blue-100 p-4 rounded-xl bg-blue-50/40 relative space-y-2.5 text-left">
               <div class="flex justify-between items-center mb-1">
-                <span class="font-extrabold text-blue-900 font-en">B/L (3)</span>
-                <label class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-2.5 py-1 rounded-lg cursor-pointer transition shadow-sm font-bold inline-flex items-center gap-1 font-en" id="btn-ocr-2" title="Upload Screenshot">
+                <span class="font-extrabold text-blue-900">B/L (3)</span>
+                <label class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-2.5 py-1 rounded-lg cursor-pointer transition shadow-sm font-bold inline-flex items-center gap-1" id="btn-ocr-2" title="Upload Screenshot">
                   <span>📷</span>
                   <input type="file" accept="image/*" class="hidden" onchange="handleOCR(event, 2)">
                 </label>
@@ -191,29 +190,29 @@
           </div>
 
           <div class="mt-6 flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-200">
-            <div class="text-sm font-bold text-slate-700 font-en">
+            <div class="text-sm font-bold text-slate-700">
               Total Weight: <span id="totalWeightDisplay" class="text-blue-700 font-black text-xl">0.00</span> Tons
             </div>
             <div class="flex gap-3">
-              <button onclick="handleManualPrintAndSave()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-6 rounded-xl shadow transition flex items-center gap-1.5 font-en text-xs sm:text-sm">
+              <button onclick="handleManualPrintAndSave()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-6 rounded-xl shadow transition flex items-center gap-1.5 text-xs sm:text-sm">
                 <span>🖨️ Print Slip</span>
               </button>
-              <button onclick="submitOrder()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-6 rounded-xl shadow transition transform active:scale-95 flex items-center gap-1.5 font-en text-xs sm:text-sm">
+              <button onclick="submitOrder()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-6 rounded-xl shadow transition transform active:scale-95 flex items-center gap-1.5 text-xs sm:text-sm">
                 <span>🚀 Send to Warehouse</span>
               </button>
             </div>
           </div>
         </div>
 
-        <!-- سجل الطلبات الحالية -->
+        <!-- Live Orders Queue -->
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
-            <h2 class="text-base font-extrabold text-slate-800 font-en">Live Operations Queue</h2>
-            <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow transition font-en">Export Excel</button>
+            <h2 class="text-base font-extrabold text-slate-800">Live Operations Queue</h2>
+            <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow transition">📊 تصدير الطلبات (Excel)</button>
           </div>
           <div class="overflow-x-auto">
-            <table class="w-full text-right text-xs sm:text-sm">
-              <thead class="bg-slate-100 text-slate-600 uppercase text-[11px] font-en">
+            <table class="w-full text-left text-xs sm:text-sm">
+              <thead class="bg-slate-100 text-slate-600 uppercase text-[11px]">
                 <tr>
                   <th class="p-3">Order ID & Time</th>
                   <th class="p-3">Employee</th>
@@ -231,25 +230,25 @@
         </div>
       </div>
 
-      <!-- 2. Warehouse -->
+      <!-- 2. Warehouse Section -->
       <div id="section-warehouse" class="hidden space-y-6">
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <h2 class="text-base font-extrabold text-slate-800 mb-4 pb-2 border-b font-en">Incoming Tahjeem Orders</h2>
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-left">
+          <h2 class="text-base font-extrabold text-slate-800 mb-4 pb-2 border-b">Incoming Tahjeem Orders</h2>
           <div id="warehouseCards" class="grid grid-cols-1 md:grid-cols-2 gap-6">
           </div>
         </div>
       </div>
 
-      <!-- 3. KPIs & Stats -->
+      <!-- 3. KPIs & Stats Section -->
       <div id="section-stats" class="hidden space-y-6">
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-left">
           <div class="flex justify-between items-center mb-6 border-b pb-4 flex-wrap gap-4">
             <div>
-              <h2 class="text-lg font-black text-blue-950 font-en">Employee Productivity Report</h2>
-              <p class="text-xs text-slate-500 font-en">Each trip order counts as 1 Car. Total B/Ls completed tracked accurately.</p>
+              <h2 class="text-lg font-black text-blue-950">Employee Productivity Report</h2>
+              <p class="text-xs text-slate-500">Each trip order counts as 1 Car. Total B/Ls completed tracked accurately.</p>
             </div>
-            <button onclick="exportStatsToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow transition font-en">
-              Export Stats (Excel)
+            <button onclick="exportStatsToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow transition">
+              📊 تصدير إحصائية الإنتاجية (Excel)
             </button>
           </div>
           <div id="statsCardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -257,39 +256,39 @@
         </div>
       </div>
 
-      <!-- 4. Archive & Data Management -->
+      <!-- 4. Archive & Data Section -->
       <div id="section-archive" class="hidden space-y-6">
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-left">
           
           <div class="flex justify-between items-center mb-6 flex-wrap gap-4 border-b pb-4">
             <div>
-              <h2 class="text-lg font-black text-blue-950 font-en">Archive & System Database</h2>
-              <p class="text-xs text-slate-500 font-en">Search records, export data, and manage storage quota.</p>
+              <h2 class="text-lg font-black text-blue-950">Archive & System Database</h2>
+              <p class="text-xs text-slate-500">Search records, export data, and manage storage quota.</p>
             </div>
             
-            <div class="flex flex-wrap items-center gap-2 font-en text-xs">
+            <div class="flex flex-wrap items-center gap-2 text-xs">
               <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 rounded-lg shadow transition">
-                Export Excel
+                📊 تصدير الأرشيف (Excel)
               </button>
               <button onclick="cleanOldOrders(7)" class="bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-2 rounded-lg shadow transition">
-                Purge &gt; 7 Days
+                🧹 حذف الأقدم من 7 أيام
               </button>
               <button onclick="cleanOldOrders(30)" class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-2 rounded-lg shadow transition">
-                Purge &gt; 30 Days
+                🗑️ حذف الأقدم من 30 يوماً
               </button>
               <button onclick="exportAndClearAll()" class="bg-red-800 hover:bg-black text-white font-extrabold px-3 py-2 rounded-lg shadow transition">
-                Clear All Database
+                ⚠️ تفريغ كامل الأرشيف
               </button>
             </div>
           </div>
 
           <div class="mb-4">
-            <input type="text" id="archiveSearchInput" oninput="filterArchive()" placeholder="Search B/L No., ALV Serial, Order ID, Clearance Co., or Employee..." class="w-full border-2 border-slate-200 rounded-xl p-3 text-xs sm:text-sm focus:outline-none focus:border-blue-600 shadow-sm font-en">
+            <input type="text" id="archiveSearchInput" oninput="filterArchive()" placeholder="Search B/L No., ALV Serial, Order ID, Clearance Co., or Employee..." class="w-full border-2 border-slate-200 rounded-xl p-3 text-xs sm:text-sm focus:outline-none focus:border-blue-600 shadow-sm">
           </div>
 
           <div class="overflow-x-auto rounded-xl border border-slate-200">
-            <table class="w-full text-right text-xs sm:text-sm">
-              <thead class="bg-blue-900 text-white uppercase text-[11px] font-en">
+            <table class="w-full text-left text-xs sm:text-sm">
+              <thead class="bg-blue-900 text-white uppercase text-[11px]">
                 <tr>
                   <th class="p-3">Order ID & Date/Time</th>
                   <th class="p-3">Staff</th>
@@ -317,7 +316,7 @@
     let usersList = [];
     let currentUser = null;
 
-    // دالة تنسيق الوقت والتاريخ بالإنجليزية بنظام 12 ساعة بدون ثوانٍ (hh:mm AM/PM)
+    // دالة تنسيق الوقت 12 ساعة بنظام AM/PM
     function formatTime12(dateObj) {
       return dateObj.toLocaleTimeString('en-US', {
         hour: '2-digit',
@@ -351,7 +350,7 @@
         usersList = await res.json();
         const select = document.getElementById('loginUserSelect');
         if (usersList.length === 0) {
-          select.innerHTML = '<option value="">-- No users found (Create New Account) --</option>';
+          select.innerHTML = '<option value="">-- No users found (Register New Account) --</option>';
         } else {
           select.innerHTML = '<option value="">-- Select Employee Name --</option>' + 
             usersList.map(u => `<option value="${u.id}">${u.name} (${u.role === 'cs' ? 'Customer Service' : 'Warehouse'})</option>`).join('');
@@ -630,7 +629,7 @@
       calcTotalWeight();
     }
 
-    // ورقة الطباعة الرسمية متضمنة التاريخ والوقت الإنجليزي بنظام 12 ساعة بدون ثوانٍ
+    // ورقة الطباعة الرسمية: عادت بالكامل باللغة العربية ومحاذاة اليمين مع الوقت 12 ساعة
     function printFormalSlip(orderId) {
       let clearanceCompany = '';
       let dateStr = '';
@@ -670,86 +669,83 @@
       printWindow.document.write(`
         <html dir="rtl">
         <head>
-          <title>Tahjeem ALV - Logistics Slip</title>
+          <title>خدمة تحجيم - Aqaba Logistics Village</title>
           <style>
             @page { size: A4 portrait; margin: 12mm; }
-            body { font-family: 'Cairo', Tahoma, Arial, sans-serif; padding: 10px; color: #000; line-height: 1.5; font-size: 15px; }
-            .font-en { font-family: 'Inter', Arial, sans-serif; }
+            body { font-family: 'Cairo', Tahoma, Arial, sans-serif; padding: 10px; color: #000; line-height: 1.5; font-size: 16px; }
             .header-title { text-align: center; font-size: 24px; font-weight: 900; margin-bottom: 2px; }
-            .sub-title { text-align: center; font-size: 19px; font-weight: 700; margin-bottom: 20px; color: #333; }
-            .top-info { display: flex; justify-content: space-between; margin-bottom: 18px; font-size: 16px; font-weight: 600; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            th, td { border: 2px solid #000; padding: 8px 6px; text-align: center; font-size: 15px; }
-            th { background-color: #f2f2f2; font-weight: 800; font-size: 15px; }
-            .section-weight { margin: 16px 0; font-size: 19px; font-weight: 800; }
-            .section-line { margin: 14px 0; font-size: 16px; font-weight: 600; }
-            .dim-container { margin-top: 16px; }
-            .dim-grid { display: flex; gap: 35px; margin-top: 8px; font-size: 16px; font-weight: 700; }
-            .notes-box { min-height: 50px; border-bottom: 1.5px dashed #444; margin-top: 6px; font-size: 15px; padding-top: 4px; }
+            .sub-title { text-align: center; font-size: 20px; font-weight: 700; margin-bottom: 22px; color: #222; }
+            .top-info { display: flex; justify-content: space-between; margin-bottom: 18px; font-size: 17px; font-weight: 600; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 22px; }
+            th, td { border: 2px solid #000; padding: 9px 6px; text-align: center; font-size: 16px; }
+            th { background-color: #f2f2f2; font-weight: 800; font-size: 16px; }
+            .section-weight { margin: 18px 0; font-size: 20px; font-weight: 800; }
+            .section-line { margin: 16px 0; font-size: 16px; font-weight: 600; }
+            .dim-container { margin-top: 18px; }
+            .dim-grid { display: flex; gap: 35px; margin-top: 10px; font-size: 17px; font-weight: 700; }
+            .notes-box { min-height: 55px; border-bottom: 1.5px dashed #444; margin-top: 6px; font-size: 16px; padding-top: 4px; }
+            .font-en { font-family: 'Inter', Arial, sans-serif; }
           </style>
         </head>
         <body>
           <div class="header-title font-en">Aqaba Logistics Village (ALV)</div>
-          <div class="sub-title">إشعار تحجيم بضاعة (Tahjeem Slip)</div>
+          <div class="sub-title">خدمة تحجيم الشحنات (LCL)</div>
 
           <div class="top-info">
-            <div><b>شركة التخليص:</b> <u class="font-en">&nbsp;${clearanceCompany || '_______________________'}&nbsp;</u></div>
-            <div>
-              <b>Date / Time:</b> 
-              <u class="font-en">&nbsp;${dateStr} • ${timeStr}&nbsp;</u>
-            </div>
+            <div><b>شركة التخليص:</b> <u>&nbsp;${clearanceCompany || '_______________________'}&nbsp;</u></div>
+            <div><b>تاريخ ووقت الطلب:</b> <u class="font-en">&nbsp;${dateStr} • ${timeStr}&nbsp;</u></div>
           </div>
 
           <table>
             <thead>
               <tr>
-                <th style="width: 16%;">Item</th>
-                <th style="width: 24%;">B/L No.</th>
-                <th style="width: 14%;">ALV Serial</th>
-                <th style="width: 12%;">Weight (T)</th>
-                <th style="width: 10%;">QTY</th>
-                <th style="width: 10%;">Pallets</th>
-                <th style="width: 14%;">Location</th>
+                <th style="width: 18%;">البند</th>
+                <th style="width: 24%;">رقم البوليصة (B/L No)</th>
+                <th style="width: 14%;">ALV</th>
+                <th style="width: 12%;">الوزن/طن</th>
+                <th style="width: 10%;">العدد</th>
+                <th style="width: 10%;">البلتات</th>
+                <th style="width: 12%;">الموقع</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td><b class="font-en">B/L (1)</b></td>
+                <td><b>البوليصة (1):</b></td>
                 <td class="font-en"><b>${bls[0]?.blNumber || ''}</b></td>
                 <td class="font-en">${bls[0]?.alvSerial || ''}</td>
                 <td class="font-en"><b>${bls[0]?.weight || ''}</b></td>
                 <td class="font-en">${bls[0]?.qty || ''}</td>
                 <td class="font-en">${bls[0]?.pallets || ''}</td>
-                <td class="font-en" style="font-weight: 900; font-size: 17px;">${bls[0]?.location || ''}</td>
+                <td class="font-en" style="font-weight: 900; font-size: 18px;">${bls[0]?.location || ''}</td>
               </tr>
               <tr>
-                <td><b class="font-en">B/L (2)</b></td>
+                <td><b>البوليصة (2):</b></td>
                 <td class="font-en"><b>${bls[1]?.blNumber || ''}</b></td>
                 <td class="font-en">${bls[1]?.alvSerial || ''}</td>
                 <td class="font-en"><b>${bls[1]?.weight || ''}</b></td>
                 <td class="font-en">${bls[1]?.qty || ''}</td>
                 <td class="font-en">${bls[1]?.pallets || ''}</td>
-                <td class="font-en" style="font-weight: 900; font-size: 17px;">${bls[1]?.location || ''}</td>
+                <td class="font-en" style="font-weight: 900; font-size: 18px;">${bls[1]?.location || ''}</td>
               </tr>
               <tr>
-                <td><b class="font-en">B/L (3)</b></td>
+                <td><b>البوليصة (3):</b></td>
                 <td class="font-en"><b>${bls[2]?.blNumber || ''}</b></td>
                 <td class="font-en">${bls[2]?.alvSerial || ''}</td>
                 <td class="font-en"><b>${bls[2]?.weight || ''}</b></td>
                 <td class="font-en">${bls[2]?.qty || ''}</td>
                 <td class="font-en">${bls[2]?.pallets || ''}</td>
-                <td class="font-en" style="font-weight: 900; font-size: 17px;">${bls[2]?.location || ''}</td>
+                <td class="font-en" style="font-weight: 900; font-size: 18px;">${bls[2]?.location || ''}</td>
               </tr>
             </tbody>
           </table>
 
           <div class="section-weight">
-            الوزن الإجمالي (Total Weight): &nbsp;&nbsp;&nbsp; 
-            <u class="font-en" style="font-size: 20px;">&nbsp;${totalWeight ? totalWeight + ' Tons' : '___________________'}&nbsp;</u>
+            الوزن الكلي (طن): &nbsp;&nbsp;&nbsp; 
+            <u class="font-en" style="font-size: 22px;">&nbsp;${totalWeight ? totalWeight + ' طن' : '___________________'}&nbsp;</u>
           </div>
 
-          <div class="section-line">
-            <b>Vehicle Type (نوع السيارة):</b> &nbsp;&nbsp;&nbsp;
+          <div class="section-line" style="margin-top: 18px;">
+            <b>نوع السيارة (يحددها موظف التحجيم):</b> &nbsp;&nbsp;&nbsp;
             ${getCheck('ديانا')} ديانا &nbsp;&nbsp;&nbsp;&nbsp;
             ${getCheck('بنقو')} بنقو &nbsp;&nbsp;&nbsp;&nbsp;
             ${getCheck('LB')} LB &nbsp;&nbsp;&nbsp;&nbsp;
@@ -758,16 +754,16 @@
           </div>
 
           <div class="dim-container">
-            <div style="font-weight: 800; font-size: 16px; margin-bottom: 4px;">Cargo Dimensions (أبعاد الشحنة كاملة):</div>
+            <div style="font-weight: 800; font-size: 17px; margin-bottom: 6px;">أبعاد الشحنة كاملة (م):</div>
             <div class="dim-grid font-en">
-              <div>Length: <u>&nbsp;${l ? l + ' m' : '___________'}&nbsp;</u></div>
-              <div>Width: <u>&nbsp;${w ? w + ' m' : '___________'}&nbsp;</u></div>
-              <div>Height: <u>&nbsp;${h ? h + ' m' : '___________'}&nbsp;</u></div>
+              <div>الطول: <u>&nbsp;${l ? l + ' م' : '___________'}&nbsp;</u></div>
+              <div>العرض: <u>&nbsp;${w ? w + ' م' : '___________'}&nbsp;</u></div>
+              <div>الارتفاع: <u>&nbsp;${h ? h + ' م' : '___________'}&nbsp;</u></div>
             </div>
           </div>
 
-          <div style="margin-top: 18px;">
-            <b style="font-size: 15px;">Warehouse Notes (ملاحظات التحجيم):</b>
+          <div style="margin-top: 22px;">
+            <b style="font-size: 16px;">ملاحظات (موظف التحجيم):</b>
             <div class="notes-box">${notes}</div>
           </div>
 
@@ -786,7 +782,7 @@
         const blDetails = order.bls.map((b, idx) => `
           <div class="font-bold text-blue-950 font-mono text-xs">
             <span class="text-slate-400 font-sans">B/L (${idx+1}):</span> ${b.blNumber} 
-            <span class="text-rose-600 bg-rose-50 px-1 rounded mr-1">(${b.location || 'No Loc'})</span>
+            <span class="text-rose-600 bg-rose-50 px-1 rounded ml-1">(${b.location || 'No Loc'})</span>
           </div>
         `).join('');
 
@@ -799,15 +795,15 @@
           <tr class="hover:bg-slate-50 transition">
             <td class="p-3">
               <div class="font-mono font-bold text-blue-900">${order.id}</div>
-              <div class="text-[11px] text-slate-500 font-en font-semibold">${timeDisplay}</div>
+              <div class="text-[11px] text-slate-500 font-semibold">${timeDisplay}</div>
             </td>
-            <td class="p-3 font-semibold text-slate-700 font-en">${order.createdBy || '-'}</td>
+            <td class="p-3 font-semibold text-slate-700">${order.createdBy || '-'}</td>
             <td class="p-3">${blDetails}</td>
-            <td class="p-3 font-black text-slate-800 font-en whitespace-nowrap">${order.totalWeight} T</td>
-            <td class="p-3"><span class="px-2.5 py-1 rounded-full text-xs font-bold font-en ${badgeClass}">${statusEn}</span></td>
-            <td class="p-3 font-bold text-indigo-700 font-en whitespace-nowrap">${order.vehicleType || '-'}</td>
+            <td class="p-3 font-black text-slate-800 whitespace-nowrap">${order.totalWeight} T</td>
+            <td class="p-3"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeClass}">${statusEn}</span></td>
+            <td class="p-3 font-bold text-indigo-700 whitespace-nowrap">${order.vehicleType || '-'}</td>
             <td class="p-3 text-center whitespace-nowrap">
-              <button onclick="printFormalSlip('${order.id}')" class="bg-slate-800 hover:bg-black text-white px-3 py-1 rounded-lg text-xs font-bold font-en shadow">🖨️ Re-Print</button>
+              <button onclick="printFormalSlip('${order.id}')" class="bg-slate-800 hover:bg-black text-white px-3 py-1 rounded-lg text-xs font-bold shadow">🖨️ Re-Print</button>
             </td>
           </tr>
         `;
@@ -818,7 +814,7 @@
       const container = document.getElementById('warehouseCards');
       const pending = state.orders.filter(o => o.status === 'بانتظار التحجيم');
       if (pending.length === 0) {
-        container.innerHTML = '<div class="col-span-2 text-center text-slate-400 py-8 font-bold font-en">No pending orders in queue ✅</div>';
+        container.innerHTML = '<div class="col-span-2 text-center text-slate-400 py-8 font-bold">No pending orders in queue ✅</div>';
         return;
       }
 
@@ -840,14 +836,14 @@
           <div class="flex justify-between items-center border-b pb-2">
             <div>
               <span class="font-black text-blue-950 text-base font-mono">${order.id}</span>
-              <div class="text-[11px] text-slate-500 font-en">By: ${order.createdBy} • ${timeDisplay}</div>
+              <div class="text-[11px] text-slate-500">By: ${order.createdBy} • ${timeDisplay}</div>
             </div>
-            <span class="text-xs bg-amber-200 text-amber-900 font-extrabold px-2.5 py-1 rounded font-en">${order.totalWeight} Tons</span>
+            <span class="text-xs bg-amber-200 text-amber-900 font-extrabold px-2.5 py-1 rounded">${order.totalWeight} Tons</span>
           </div>
 
           <div class="space-y-2.5">
             ${order.bls.map((b, idx) => `
-              <div class="bg-white p-3 rounded-xl border text-xs shadow-sm space-y-1 font-en">
+              <div class="bg-white p-3 rounded-xl border text-xs shadow-sm space-y-1">
                 <div class="flex justify-between items-center border-b pb-1">
                   <div><span class="text-slate-500">B/L (${idx + 1}):</span> <b class="text-blue-900 font-mono text-sm">${b.blNumber}</b></div>
                   <div class="bg-blue-100 text-blue-900 px-2 py-0.5 rounded font-mono font-bold">ALV: ${b.alvSerial || '-'}</div>
@@ -863,7 +859,7 @@
             `).join('')}
           </div>
 
-          <div class="bg-white p-4 rounded-xl border space-y-3 font-en">
+          <div class="bg-white p-4 rounded-xl border space-y-3">
             <div class="font-extrabold text-xs text-slate-700 uppercase tracking-wider">Cargo Dimensions (Meters):</div>
             <div class="grid grid-cols-3 gap-2">
               <input type="number" step="0.01" id="m-l-${order.id}" value="${currentValues[`l-${order.id}`] || ''}" placeholder="Length (L)" class="border rounded-lg p-2 text-center text-xs sm:text-sm font-bold">
@@ -876,11 +872,11 @@
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Vehicle Type:</label>
                 <select id="m-veh-${order.id}" class="w-full border rounded-lg p-2 text-xs sm:text-sm font-bold bg-slate-50">
                   <option value="">-- Select Vehicle --</option>
-                  <option value="ديانا" ${currentValues[`veh-${order.id}`] === 'ديانا' ? 'selected' : ''}>ديانا</option>
-                  <option value="بنقو" ${currentValues[`veh-${order.id}`] === 'بنقو' ? 'selected' : ''}>بنقو</option>
+                  <option value="ديانا" ${currentValues[`veh-${order.id}`] === 'ديانا' ? 'selected' : ''}>Diana</option>
+                  <option value="بنقو" ${currentValues[`veh-${order.id}`] === 'بنقو' ? 'selected' : ''}>Bongo</option>
                   <option value="LB" ${currentValues[`veh-${order.id}`] === 'LB' ? 'selected' : ''}>LB</option>
-                  <option value="سنقل" ${currentValues[`veh-${order.id}`] === 'سنقل' ? 'selected' : ''}>سنقل</option>
-                  <option value="تريلا" ${currentValues[`veh-${order.id}`] === 'تريلا' ? 'selected' : ''}>تريلا</option>
+                  <option value="سنقل" ${currentValues[`veh-${order.id}`] === 'سنقل' ? 'selected' : ''}>Single</option>
+                  <option value="تريلا" ${currentValues[`veh-${order.id}`] === 'تريلا' ? 'selected' : ''}>Trailer</option>
                 </select>
               </div>
               <div>
@@ -926,20 +922,20 @@
       const container = document.getElementById('statsCardsContainer');
 
       if (Object.keys(stats).length === 0) {
-        container.innerHTML = '<div class="col-span-3 text-center py-8 text-slate-400 font-bold font-en">No KPI data recorded yet</div>';
+        container.innerHTML = '<div class="col-span-3 text-center py-8 text-slate-400 font-bold">No KPI data recorded yet</div>';
         return;
       }
 
       container.innerHTML = Object.entries(stats).map(([name, data]) => `
         <div class="bg-gradient-to-br from-white to-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-          <div class="flex justify-between items-center border-b pb-3 font-en">
+          <div class="flex justify-between items-center border-b pb-3">
             <div>
               <h3 class="font-black text-lg text-blue-950">${name}</h3>
               <span class="text-xs bg-blue-100 text-blue-900 px-2 py-0.5 rounded-md font-bold uppercase">${data.role}</span>
             </div>
             <div class="text-2xl">👤</div>
           </div>
-          <div class="grid grid-cols-2 gap-3 text-center pt-2 font-en">
+          <div class="grid grid-cols-2 gap-3 text-center pt-2">
             <div class="bg-blue-50 p-4 rounded-xl border border-blue-200">
               <span class="text-xs text-slate-600 font-bold block mb-1">Total B/Ls Done</span>
               <span class="text-3xl font-black text-blue-700">${data.totalBLs}</span>
@@ -953,18 +949,19 @@
       `).join('');
     }
 
+    // تصدير إحصائية الإنتاجية إلى إكسل باللغة العربية
     function exportStatsToExcel() {
       fetch('/api/stats').then(r => r.json()).then(stats => {
         const data = Object.entries(stats).map(([name, d]) => ({
-          'Employee': name,
-          'Department': d.role,
-          'Total B/Ls Completed': d.totalBLs,
-          'Total Trips / Cars': d.totalCars
+          'اسم الموظف': name,
+          'القسم / الدور': d.role,
+          'عدد البوالص المنجزة': d.totalBLs,
+          'عدد السيارات المطبوعة (الإجمالي)': d.totalCars
         }));
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "KPIs");
-        XLSX.writeFile(wb, `Tahjeem_ALV_KPIs_${new Date().toISOString().slice(0,10)}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, "إنتاجية الموظفين");
+        XLSX.writeFile(wb, `احصائية_انجاز_الموظفين_${new Date().toISOString().slice(0,10)}.xlsx`);
       });
     }
 
@@ -973,7 +970,7 @@
       const ordersToDisplay = filteredOrders || state.orders;
 
       if (ordersToDisplay.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center p-8 text-slate-400 font-bold font-en">No archive records found</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center p-8 text-slate-400 font-bold">No archive records found</td></tr>`;
         return;
       }
 
@@ -982,7 +979,7 @@
         const timeDisplay = `${formatDateEn(d)} • ${formatTime12(d)}`;
 
         const blsRows = order.bls.map((b, i) => `
-          <div class="mb-1 pb-1 border-b border-slate-100 last:border-0 font-en text-xs">
+          <div class="mb-1 pb-1 border-b border-slate-100 last:border-0 text-xs">
             <b class="text-blue-950 font-mono">B/L (${i+1}): ${b.blNumber}</b> 
             | <span class="text-slate-500 font-mono">ALV: ${b.alvSerial || '-'}</span>
             | <span class="text-rose-600 font-bold">${b.location || '-'}</span>
@@ -992,7 +989,7 @@
 
         const dims = order.measurements?.length 
           ? `<div class="font-mono text-xs font-bold text-slate-700">${order.measurements.length} × ${order.measurements.width} × ${order.measurements.height} m</div>` 
-          : '<span class="text-slate-400 text-xs font-en">-</span>';
+          : '<span class="text-slate-400 text-xs">-</span>';
 
         const isDone = order.status === 'تم التحجيم';
         const isManual = order.status === 'طباعة يدوية';
@@ -1003,22 +1000,22 @@
           <tr class="hover:bg-blue-50/40 transition">
             <td class="p-3">
               <div class="font-mono font-bold text-blue-900">${order.id}</div>
-              <div class="text-[11px] text-slate-500 font-en font-semibold">${timeDisplay}</div>
+              <div class="text-[11px] text-slate-500 font-semibold">${timeDisplay}</div>
             </td>
             <td class="p-3">
-              <div class="font-bold text-slate-800 font-en">${order.createdBy || '-'}</div>
-              ${order.measuredBy ? `<div class="text-[10px] text-slate-400 font-en">WH: ${order.measuredBy}</div>` : ''}
+              <div class="font-bold text-slate-800">${order.createdBy || '-'}</div>
+              ${order.measuredBy ? `<div class="text-[10px] text-slate-400">WH: ${order.measuredBy}</div>` : ''}
             </td>
             <td class="p-3">${blsRows}</td>
-            <td class="p-3 font-bold text-slate-900 whitespace-nowrap font-en">${order.totalWeight} T</td>
+            <td class="p-3 font-bold text-slate-900 whitespace-nowrap">${order.totalWeight} T</td>
             <td class="p-3 whitespace-nowrap">${dims}</td>
-            <td class="p-3 font-bold text-indigo-700 whitespace-nowrap font-en">${order.vehicleType || '-'}</td>
+            <td class="p-3 font-bold text-indigo-700 whitespace-nowrap">${order.vehicleType || '-'}</td>
             <td class="p-3">
-              <span class="px-2 py-0.5 rounded-full text-xs font-bold font-en ${badgeClass}">${statusEn}</span>
+              <span class="px-2 py-0.5 rounded-full text-xs font-bold ${badgeClass}">${statusEn}</span>
               ${order.shareefNotes ? `<div class="text-xs text-slate-500 mt-1 italic max-w-xs">📝 ${order.shareefNotes}</div>` : ''}
             </td>
             <td class="p-3 text-center whitespace-nowrap">
-              <button onclick="printFormalSlip('${order.id}')" class="bg-slate-800 hover:bg-black text-white px-2.5 py-1 rounded-lg text-xs font-bold font-en shadow">🖨️ Print</button>
+              <button onclick="printFormalSlip('${order.id}')" class="bg-slate-800 hover:bg-black text-white px-2.5 py-1 rounded-lg text-xs font-bold shadow">🖨️ Print</button>
             </td>
           </tr>
         `;
@@ -1050,54 +1047,55 @@
       renderArchive(filtered);
     }
 
+    // تصدير سجل الطلبات والأرشيف إلى إكسل باللغة العربية
     function exportToExcel() {
       const data = [];
       state.orders.forEach(o => {
         const d = new Date(o.createdAt);
         o.bls.forEach((b, idx) => {
           data.push({
-            'Order ID': o.id,
-            'Date': formatDateEn(d),
-            'Time': formatTime12(d),
-            'Created By': o.createdBy,
-            'Tahjeem Staff': o.measuredBy || '-',
-            'Status': o.status,
-            'Vehicle': o.vehicleType || '-',
-            'Item': `B/L (${idx + 1})`,
-            'B/L No.': b.blNumber,
+            'رقم الطلب': o.id,
+            'التاريخ': formatDateEn(d),
+            'الوقت': formatTime12(d),
+            'منشئ الطلب': o.createdBy,
+            'موظف التحجيم': o.measuredBy || '-',
+            'الحالة': o.status,
+            'نوع السيارة': o.vehicleType || '-',
+            'البند': `بوليصة (${idx + 1})`,
+            'رقم البوليصة (B/L)': b.blNumber,
             'ALV Serial': b.alvSerial,
-            'QTY': b.qty,
-            'Weight (Tons)': b.weight,
-            'Pallets': b.pallets,
-            'Location': b.location,
-            'Clearance Co.': b.clearanceCompany,
-            'Length (m)': o.measurements?.length || '-',
-            'Width (m)': o.measurements?.width || '-',
-            'Height (m)': o.measurements?.height || '-',
-            'Warehouse Notes': o.shareefNotes || '-'
+            'العدد': b.qty,
+            'الوزن (طن)': b.weight,
+            'البلتات': b.pallets,
+            'الموقع': b.location,
+            'شركة التخليص': b.clearanceCompany,
+            'الطول (م)': o.measurements?.length || '-',
+            'العرض (م)': o.measurements?.width || '-',
+            'الارتفاع (م)': o.measurements?.height || '-',
+            'ملاحظات موظف التحجيم': o.shareefNotes || '-'
           });
         });
       });
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Archive");
-      XLSX.writeFile(wb, `Tahjeem_ALV_Archive_${new Date().toISOString().slice(0,10)}.xlsx`);
+      XLSX.utils.book_append_sheet(wb, ws, "أرشيف الطلبات");
+      XLSX.writeFile(wb, `ارشيف_طلبات_التحجيم_${new Date().toISOString().slice(0,10)}.xlsx`);
     }
 
     async function cleanOldOrders(days) {
-      if (!confirm(`Purge orders older than ${days} days?`)) return;
+      if (!confirm(`هل أنت متأكد من حذف الطلبات الأقدم من ${days} يوماً لتوفير المساحة؟`)) return;
       await fetch(`/api/orders/clean?days=${days}`, { method: 'DELETE' });
       loadData();
-      alert(`Cleaned successfully ✅`);
+      alert(`تم تنظيف السجلات بنجاح ✅`);
     }
 
     async function exportAndClearAll() {
-      if (!confirm('⚠️ Export full excel and clear entire database permanently?')) return;
+      if (!confirm('⚠️ تحذير: سيتم أولاً تحميل ملف إكسل بكامل السجلات، ثم تفريغ الأرشيف بالكامل من قاعدة البيانات.\nهل ترغب بالمتابعة؟')) return;
       exportToExcel();
       setTimeout(async () => {
         await fetch('/api/orders/clear-all', { method: 'DELETE' });
         loadData();
-        alert('Database cleared successfully 🚀');
+        alert('تم تصدير البيانات وتفريغ قاعدة البيانات بالكامل بنجاح 🚀');
       }, 1500);
     }
 
