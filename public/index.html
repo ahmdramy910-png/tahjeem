@@ -3,254 +3,253 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>نظام إدارة طلبات التحجيم - العقبة للوجستيات ALV</title>
+  <title>Tahjeem ALV - Aqaba Logistics Village</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;600;700;800;900&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Cairo', sans-serif; }
+    .font-en { font-family: 'Inter', sans-serif; }
     .badge-tahjeem { background-color: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
     .badge-done { background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
     .badge-manual { background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
   </style>
 </head>
-<body class="bg-gray-100 text-gray-800 min-h-screen">
+<body class="bg-slate-100 text-slate-800 min-h-screen">
 
-  <!-- شاشة الدخول الاحترافية العازلة (خلفية كاملة مع شعار واسم قرية العقبة اللوجستية) -->
+  <!-- شاشة الدخول الاحترافية (Tahjeem ALV) -->
   <div id="loginOverlay" class="fixed inset-0 bg-slate-900 bg-opacity-95 z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full border border-slate-200 text-center space-y-5">
       
-      <!-- ترويسة الشعار واسم الشركة -->
       <div class="space-y-1">
-        <div class="w-16 h-16 bg-blue-900 text-white rounded-2xl flex items-center justify-center mx-auto text-3xl shadow-lg font-black">
+        <div class="w-16 h-16 bg-blue-900 text-white rounded-2xl flex items-center justify-center mx-auto text-2xl font-black font-en shadow-lg tracking-wider">
           ALV
         </div>
-        <h2 class="text-xl font-extrabold text-blue-950 pt-2">قرية العقبة اللوجستية</h2>
-        <p class="text-xs text-gray-500 font-semibold">Aqaba Logistics Village (ALV) - LCL System</p>
+        <h2 class="text-2xl font-black text-blue-950 pt-2 font-en tracking-tight">Tahjeem ALV</h2>
+        <p class="text-xs text-slate-500 font-semibold font-en">Aqaba Logistics Village • LCL Operations</p>
       </div>
 
-      <!-- مفاتيح التبديل بين الدخول وإنشاء الحساب -->
-      <div class="grid grid-cols-2 p-1 bg-slate-100 rounded-xl text-sm font-bold">
+      <div class="grid grid-cols-2 p-1 bg-slate-100 rounded-xl text-xs sm:text-sm font-bold font-en">
         <button id="btnAuthLogin" onclick="switchAuthMode('login')" class="py-2 rounded-lg bg-blue-900 text-white shadow transition">
-          تسجيل الدخول
+          Sign In
         </button>
-        <button id="btnAuthRegister" onclick="switchAuthMode('register')" class="py-2 rounded-lg text-gray-600 hover:text-blue-900 transition">
-          حساب جديد
+        <button id="btnAuthRegister" onclick="switchAuthMode('register')" class="py-2 rounded-lg text-slate-600 hover:text-blue-900 transition">
+          New Account
         </button>
       </div>
 
-      <!-- 1. نموذج تسجيل الدخول -->
+      <!-- Sign In -->
       <div id="formLogin" class="space-y-4 text-right">
         <div>
-          <label class="block text-xs font-bold text-gray-700 mb-1">اختر الموظف:</label>
-          <select id="loginUserSelect" class="w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-bold focus:border-blue-700 focus:outline-none bg-gray-50">
-            <option value="">-- اضغط لاختيار اسمك --</option>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Select User:</label>
+          <select id="loginUserSelect" class="w-full border-2 border-slate-200 rounded-xl p-3 text-sm font-bold focus:border-blue-700 focus:outline-none bg-slate-50 font-en">
+            <option value="">-- Select User / اختر الموظف --</option>
           </select>
         </div>
         <div>
-          <label class="block text-xs font-bold text-gray-700 mb-1">كلمة المرور:</label>
-          <input type="password" id="loginPassword" placeholder="••••••••" class="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-blue-700 focus:outline-none">
+          <label class="block text-xs font-bold text-slate-700 mb-1">Password (8+ chars):</label>
+          <input type="password" id="loginPassword" placeholder="••••••••" class="w-full border-2 border-slate-200 rounded-xl p-3 text-sm focus:border-blue-700 focus:outline-none font-en">
         </div>
-        <button onclick="performLogin()" class="w-full bg-blue-900 hover:bg-blue-800 text-white font-bold py-3 rounded-xl shadow-md transition transform active:scale-95">
-          دخول للنظام 🔒
+        <button onclick="performLogin()" class="w-full bg-blue-900 hover:bg-blue-800 text-white font-bold py-3 rounded-xl shadow-md transition transform active:scale-95 font-en text-sm">
+          Access System 🔒
         </button>
       </div>
 
-      <!-- 2. نموذج إنشاء حساب جديد -->
+      <!-- New Account -->
       <div id="formRegister" class="space-y-3 text-right hidden">
         <div>
-          <label class="block text-xs font-bold text-gray-700 mb-1">الاسم الكامل:</label>
-          <input type="text" id="regName" placeholder="اكتب اسمك الثلاثي" class="w-full border-2 border-gray-200 rounded-xl p-2.5 text-sm focus:border-blue-700 focus:outline-none">
+          <label class="block text-xs font-bold text-slate-700 mb-1">Employee Full Name:</label>
+          <input type="text" id="regName" placeholder="e.g. Ahmad Rami" class="w-full border-2 border-slate-200 rounded-xl p-2.5 text-sm focus:border-blue-700 focus:outline-none font-en">
         </div>
         <div>
-          <label class="block text-xs font-bold text-gray-700 mb-1">القسم:</label>
-          <select id="regRole" class="w-full border-2 border-gray-200 rounded-xl p-2.5 text-sm font-bold bg-gray-50">
-            <option value="cs">قسم خدمة العملاء (CS)</option>
-            <option value="warehouse">المستودع (موظف التحجيم)</option>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Role / Department:</label>
+          <select id="regRole" class="w-full border-2 border-slate-200 rounded-xl p-2.5 text-sm font-bold bg-slate-50 font-en">
+            <option value="cs">Customer Service (CS)</option>
+            <option value="warehouse">Warehouse (Tahjeem)</option>
           </select>
         </div>
         <div>
-          <label class="block text-xs font-bold text-gray-700 mb-1">كلمة المرور (8 خانات على الأقل):</label>
-          <input type="password" id="regPassword" placeholder="8 خانات على الأقل" class="w-full border-2 border-gray-200 rounded-xl p-2.5 text-sm focus:border-blue-700 focus:outline-none">
+          <label class="block text-xs font-bold text-slate-700 mb-1">Password (8 chars min):</label>
+          <input type="password" id="regPassword" placeholder="Minimum 8 characters" class="w-full border-2 border-slate-200 rounded-xl p-2.5 text-sm focus:border-blue-700 focus:outline-none font-en">
         </div>
         <div>
-          <label class="block text-xs font-bold text-gray-700 mb-1">تأكيد كلمة المرور:</label>
-          <input type="password" id="regPasswordConfirm" placeholder="أعد كتابة كلمة المرور" class="w-full border-2 border-gray-200 rounded-xl p-2.5 text-sm focus:border-blue-700 focus:outline-none">
+          <label class="block text-xs font-bold text-slate-700 mb-1">Confirm Password:</label>
+          <input type="password" id="regPasswordConfirm" placeholder="Re-enter password" class="w-full border-2 border-slate-200 rounded-xl p-2.5 text-sm focus:border-blue-700 focus:outline-none font-en">
         </div>
-        <button onclick="performRegister()" class="w-full bg-green-700 hover:bg-green-800 text-white font-bold py-3 rounded-xl shadow-md transition transform active:scale-95">
-          إنشاء الحساب والدخول 🚀
+        <button onclick="performRegister()" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 rounded-xl shadow-md transition transform active:scale-95 font-en text-sm">
+          Create Account & Log In 🚀
         </button>
       </div>
 
-      <div id="authError" class="text-red-600 text-xs font-bold hidden bg-red-50 p-2.5 rounded-lg border border-red-200"></div>
+      <div id="authError" class="text-rose-600 text-xs font-bold hidden bg-rose-50 p-2.5 rounded-lg border border-rose-200 font-en"></div>
 
-      <div class="pt-2 text-[11px] text-gray-400 border-t">
-        نظام التحجيم الرقمي © ALV 2026
+      <div class="pt-2 text-[11px] text-slate-400 border-t font-en">
+        Tahjeem ALV Digital Platform © 2026
       </div>
     </div>
   </div>
 
-  <!-- التطبيق الداخلي (محمي ولا يظهر إلا بعد الدخول) -->
+  <!-- لوحة العمليات الداخلية -->
   <div id="mainApp" class="hidden">
-    <!-- الشريط العلوي -->
     <nav class="bg-blue-900 text-white shadow-md sticky top-0 z-40">
       <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
         <div class="flex items-center space-x-3 space-x-reverse">
-          <span class="text-2xl font-black bg-blue-800 px-2.5 py-1 rounded-lg">ALV</span>
+          <span class="text-xl font-black bg-blue-800 px-2.5 py-1 rounded-lg font-en tracking-wider">ALV</span>
           <div>
-            <h1 class="text-base sm:text-lg font-black leading-none">نظام طلبات التحجيم (LCL)</h1>
-            <span class="text-[11px] text-blue-200">قرية العقبة اللوجستية</span>
+            <h1 class="text-lg font-black leading-none font-en tracking-wide">Tahjeem ALV</h1>
+            <span class="text-[11px] text-blue-200 font-en">Aqaba Logistics Village</span>
           </div>
         </div>
         <div class="flex items-center space-x-4 space-x-reverse text-sm">
-          <div class="bg-blue-800 px-3 py-1.5 rounded-lg flex items-center gap-2 border border-blue-700">
-            <span class="w-2.5 h-2.5 rounded-full bg-green-400"></span>
+          <div class="bg-blue-800 px-3 py-1.5 rounded-lg flex items-center gap-2 border border-blue-700 font-en">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
             <span id="navUserName" class="font-bold text-white">-</span>
-            <span id="navUserRole" class="text-xs text-blue-200 bg-blue-950 px-2 py-0.5 rounded font-semibold">-</span>
+            <span id="navUserRole" class="text-[11px] text-blue-200 bg-blue-950 px-2 py-0.5 rounded font-semibold uppercase tracking-wider">-</span>
           </div>
-          <button onclick="logout()" class="bg-rose-700 hover:bg-rose-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">خروج</button>
+          <button onclick="logout()" class="bg-rose-700 hover:bg-rose-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition font-en">Logout</button>
         </div>
       </div>
     </nav>
 
     <div class="max-w-7xl mx-auto px-4 py-6">
-      <!-- شريط التبويبات -->
-      <div class="flex border-b border-gray-300 mb-6 bg-white rounded-t-lg px-4 pt-2 shadow-sm flex-wrap gap-2">
-        <button onclick="switchTab('cs')" id="tab-cs" class="py-3 px-6 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition">خدمة العملاء</button>
-        <button onclick="switchTab('warehouse')" id="tab-wh" class="py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition">المستودع</button>
-        <button onclick="switchTab('stats')" id="tab-stats" class="py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition">📊 الإنتاجية</button>
-        <button onclick="switchTab('archive')" id="tab-arc" class="py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition">📁 الأرشيف وإدارة السجلات</button>
+      <!-- التبويبات الرئيسية -->
+      <div class="flex border-b border-slate-300 mb-6 bg-white rounded-t-xl px-4 pt-2 shadow-sm flex-wrap gap-2 font-en text-sm">
+        <button onclick="switchTab('cs')" id="tab-cs" class="py-3 px-5 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition">Customer Service</button>
+        <button onclick="switchTab('warehouse')" id="tab-wh" class="py-3 px-5 font-bold text-slate-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition">Warehouse</button>
+        <button onclick="switchTab('stats')" id="tab-stats" class="py-3 px-5 font-bold text-slate-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition">KPIs & Stats</button>
+        <button onclick="switchTab('archive')" id="tab-arc" class="py-3 px-5 font-bold text-slate-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition">Archive & Data</button>
       </div>
 
-      <!-- 1. تبويب خدمة العملاء -->
+      <!-- 1. Customer Service -->
       <div id="section-cs" class="space-y-6">
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <h2 class="text-base font-extrabold text-blue-900 mb-4 pb-2 border-b flex justify-between items-center">
-            <span>إنشاء طلب تحجيم جديد</span>
-          </h2>
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <div class="flex justify-between items-center mb-4 pb-2 border-b">
+            <h2 class="text-base font-extrabold text-blue-950 font-en">New Shipment Order (Max 3 B/Ls)</h2>
+            <span class="text-xs text-slate-400 font-en">Trip / Car Order</span>
+          </div>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="bls-container">
-            <!-- بوليصة 1 -->
-            <div class="border border-blue-100 p-4 rounded-xl bg-blue-50/40 relative space-y-2">
-              <div class="flex justify-between items-center mb-2">
-                <span class="font-bold text-blue-900">بوليصة #1</span>
-                <label class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-3 py-1 rounded-lg cursor-pointer transition shadow-sm inline-flex items-center justify-center font-bold" id="btn-ocr-0" title="رفع صورة">
+            <!-- B/L 1 -->
+            <div class="border border-blue-100 p-4 rounded-xl bg-blue-50/40 relative space-y-2.5">
+              <div class="flex justify-between items-center mb-1">
+                <span class="font-extrabold text-blue-900 font-en">B/L (1)</span>
+                <label class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-2.5 py-1 rounded-lg cursor-pointer transition shadow-sm font-bold inline-flex items-center gap-1 font-en" id="btn-ocr-0" title="Upload Screenshot">
                   <span>📷</span>
                   <input type="file" accept="image/*" class="hidden" onchange="handleOCR(event, 0)">
                 </label>
               </div>
-              <input type="text" id="bl-0-no" placeholder="رقم البوليصة (B/L No)" class="w-full border rounded-lg px-3 py-1.5 text-sm">
-              <input type="text" id="bl-0-alv" placeholder="ALV Serial" class="w-full border rounded-lg px-3 py-1.5 text-sm">
+              <input type="text" id="bl-0-no" placeholder="B/L No." class="w-full border rounded-lg px-3 py-1.5 text-xs sm:text-sm font-mono font-bold">
+              <input type="text" id="bl-0-alv" placeholder="ALV Serial" class="w-full border rounded-lg px-3 py-1.5 text-xs sm:text-sm font-mono">
               <div class="grid grid-cols-3 gap-2">
-                <input type="number" id="bl-0-qty" placeholder="العدد" class="border rounded-lg px-2 py-1.5 text-sm">
-                <input type="number" step="0.1" id="bl-0-weight" oninput="calcTotalWeight()" placeholder="الوزن" class="border rounded-lg px-2 py-1.5 text-sm bg-yellow-50 font-bold">
-                <input type="number" id="bl-0-pallets" placeholder="البلتات" class="border rounded-lg px-2 py-1.5 text-sm">
+                <input type="number" id="bl-0-qty" placeholder="QTY" class="border rounded-lg px-2 py-1.5 text-xs text-center font-bold">
+                <input type="number" step="0.1" id="bl-0-weight" oninput="calcTotalWeight()" placeholder="Weight (T)" class="border rounded-lg px-2 py-1.5 text-xs text-center bg-amber-50 font-black text-blue-950">
+                <input type="number" id="bl-0-pallets" placeholder="Pallets" class="border rounded-lg px-2 py-1.5 text-xs text-center font-bold">
               </div>
-              <input type="text" id="bl-0-loc" placeholder="الموقع" class="w-full border rounded-lg px-3 py-1.5 text-sm">
-              <input type="text" id="bl-0-company" placeholder="شركة التخليص" class="w-full border rounded-lg px-3 py-1.5 text-sm">
+              <input type="text" id="bl-0-loc" placeholder="Location" class="w-full border rounded-lg px-3 py-1.5 text-xs sm:text-sm font-bold text-rose-700 bg-rose-50/50">
+              <input type="text" id="bl-0-company" placeholder="Clearance Co." class="w-full border rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold">
             </div>
 
-            <!-- بوليصة 2 -->
-            <div class="border border-blue-100 p-4 rounded-xl bg-blue-50/40 relative space-y-2">
-              <div class="flex justify-between items-center mb-2">
-                <span class="font-bold text-blue-900">بوليصة #2</span>
-                <label class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-3 py-1 rounded-lg cursor-pointer transition shadow-sm inline-flex items-center justify-center font-bold" id="btn-ocr-1" title="رفع صورة">
+            <!-- B/L 2 -->
+            <div class="border border-blue-100 p-4 rounded-xl bg-blue-50/40 relative space-y-2.5">
+              <div class="flex justify-between items-center mb-1">
+                <span class="font-extrabold text-blue-900 font-en">B/L (2)</span>
+                <label class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-2.5 py-1 rounded-lg cursor-pointer transition shadow-sm font-bold inline-flex items-center gap-1 font-en" id="btn-ocr-1" title="Upload Screenshot">
                   <span>📷</span>
                   <input type="file" accept="image/*" class="hidden" onchange="handleOCR(event, 1)">
                 </label>
               </div>
-              <input type="text" id="bl-1-no" placeholder="رقم البوليصة (B/L No)" class="w-full border rounded-lg px-3 py-1.5 text-sm">
-              <input type="text" id="bl-1-alv" placeholder="ALV Serial" class="w-full border rounded-lg px-3 py-1.5 text-sm">
+              <input type="text" id="bl-1-no" placeholder="B/L No." class="w-full border rounded-lg px-3 py-1.5 text-xs sm:text-sm font-mono font-bold">
+              <input type="text" id="bl-1-alv" placeholder="ALV Serial" class="w-full border rounded-lg px-3 py-1.5 text-xs sm:text-sm font-mono">
               <div class="grid grid-cols-3 gap-2">
-                <input type="number" id="bl-1-qty" placeholder="العدد" class="border rounded-lg px-2 py-1.5 text-sm">
-                <input type="number" step="0.1" id="bl-1-weight" oninput="calcTotalWeight()" placeholder="الوزن" class="border rounded-lg px-2 py-1.5 text-sm bg-yellow-50 font-bold">
-                <input type="number" id="bl-1-pallets" placeholder="البلتات" class="border rounded-lg px-2 py-1.5 text-sm">
+                <input type="number" id="bl-1-qty" placeholder="QTY" class="border rounded-lg px-2 py-1.5 text-xs text-center font-bold">
+                <input type="number" step="0.1" id="bl-1-weight" oninput="calcTotalWeight()" placeholder="Weight (T)" class="border rounded-lg px-2 py-1.5 text-xs text-center bg-amber-50 font-black text-blue-950">
+                <input type="number" id="bl-1-pallets" placeholder="Pallets" class="border rounded-lg px-2 py-1.5 text-xs text-center font-bold">
               </div>
-              <input type="text" id="bl-1-loc" placeholder="الموقع" class="w-full border rounded-lg px-3 py-1.5 text-sm">
-              <input type="text" id="bl-1-company" placeholder="شركة التخليص" class="w-full border rounded-lg px-3 py-1.5 text-sm">
+              <input type="text" id="bl-1-loc" placeholder="Location" class="w-full border rounded-lg px-3 py-1.5 text-xs sm:text-sm font-bold text-rose-700 bg-rose-50/50">
+              <input type="text" id="bl-1-company" placeholder="Clearance Co." class="w-full border rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold">
             </div>
 
-            <!-- بوليصة 3 -->
-            <div class="border border-blue-100 p-4 rounded-xl bg-blue-50/40 relative space-y-2">
-              <div class="flex justify-between items-center mb-2">
-                <span class="font-bold text-blue-900">بوليصة #3</span>
-                <label class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-3 py-1 rounded-lg cursor-pointer transition shadow-sm inline-flex items-center justify-center font-bold" id="btn-ocr-2" title="رفع صورة">
+            <!-- B/L 3 -->
+            <div class="border border-blue-100 p-4 rounded-xl bg-blue-50/40 relative space-y-2.5">
+              <div class="flex justify-between items-center mb-1">
+                <span class="font-extrabold text-blue-900 font-en">B/L (3)</span>
+                <label class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-2.5 py-1 rounded-lg cursor-pointer transition shadow-sm font-bold inline-flex items-center gap-1 font-en" id="btn-ocr-2" title="Upload Screenshot">
                   <span>📷</span>
                   <input type="file" accept="image/*" class="hidden" onchange="handleOCR(event, 2)">
                 </label>
               </div>
-              <input type="text" id="bl-2-no" placeholder="رقم البوليصة (B/L No)" class="w-full border rounded-lg px-3 py-1.5 text-sm">
-              <input type="text" id="bl-2-alv" placeholder="ALV Serial" class="w-full border rounded-lg px-3 py-1.5 text-sm">
+              <input type="text" id="bl-2-no" placeholder="B/L No." class="w-full border rounded-lg px-3 py-1.5 text-xs sm:text-sm font-mono font-bold">
+              <input type="text" id="bl-2-alv" placeholder="ALV Serial" class="w-full border rounded-lg px-3 py-1.5 text-xs sm:text-sm font-mono">
               <div class="grid grid-cols-3 gap-2">
-                <input type="number" id="bl-2-qty" placeholder="العدد" class="border rounded-lg px-2 py-1.5 text-sm">
-                <input type="number" step="0.1" id="bl-2-weight" oninput="calcTotalWeight()" placeholder="الوزن" class="border rounded-lg px-2 py-1.5 text-sm bg-yellow-50 font-bold">
-                <input type="number" id="bl-2-pallets" placeholder="البلتات" class="border rounded-lg px-2 py-1.5 text-sm">
+                <input type="number" id="bl-2-qty" placeholder="QTY" class="border rounded-lg px-2 py-1.5 text-xs text-center font-bold">
+                <input type="number" step="0.1" id="bl-2-weight" oninput="calcTotalWeight()" placeholder="Weight (T)" class="border rounded-lg px-2 py-1.5 text-xs text-center bg-amber-50 font-black text-blue-950">
+                <input type="number" id="bl-2-pallets" placeholder="Pallets" class="border rounded-lg px-2 py-1.5 text-xs text-center font-bold">
               </div>
-              <input type="text" id="bl-2-loc" placeholder="الموقع" class="w-full border rounded-lg px-3 py-1.5 text-sm">
-              <input type="text" id="bl-2-company" placeholder="شركة التخليص" class="w-full border rounded-lg px-3 py-1.5 text-sm">
+              <input type="text" id="bl-2-loc" placeholder="Location" class="w-full border rounded-lg px-3 py-1.5 text-xs sm:text-sm font-bold text-rose-700 bg-rose-50/50">
+              <input type="text" id="bl-2-company" placeholder="Clearance Co." class="w-full border rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold">
             </div>
           </div>
 
-          <div class="mt-6 flex flex-wrap items-center justify-between gap-4 pt-4 border-t">
-            <div class="text-base font-bold text-gray-700">
-              الوزن الإجمالي: <span id="totalWeightDisplay" class="text-blue-700 font-extrabold text-xl">0.00</span> طن
+          <div class="mt-6 flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-200">
+            <div class="text-sm font-bold text-slate-700 font-en">
+              Total Weight: <span id="totalWeightDisplay" class="text-blue-700 font-black text-xl">0.00</span> Tons
             </div>
             <div class="flex gap-3">
-              <button onclick="handleManualPrintAndSave()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-6 rounded-xl shadow transition flex items-center gap-1.5">
-                <span>🖨️ طباعة</span>
+              <button onclick="handleManualPrintAndSave()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-6 rounded-xl shadow transition flex items-center gap-1.5 font-en text-xs sm:text-sm">
+                <span>🖨️ Print Slip</span>
               </button>
-              <button onclick="submitOrder()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-6 rounded-xl shadow transition transform active:scale-95 flex items-center gap-1.5">
-                <span>🚀 إرسال</span>
+              <button onclick="submitOrder()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-6 rounded-xl shadow transition transform active:scale-95 flex items-center gap-1.5 font-en text-xs sm:text-sm">
+                <span>🚀 Send to Warehouse</span>
               </button>
             </div>
           </div>
         </div>
 
-        <!-- السجل المباشر -->
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <!-- سجل الطلبات الحالية -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
-            <h2 class="text-base font-bold text-gray-800">سجل الطلبات الحالية</h2>
-            <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow transition">📊 تصدير Excel</button>
+            <h2 class="text-base font-extrabold text-slate-800 font-en">Live Operations Queue</h2>
+            <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow transition font-en">Export Excel</button>
           </div>
           <div class="overflow-x-auto">
-            <table class="w-full text-right text-sm">
-              <thead class="bg-gray-100 text-gray-600 uppercase text-xs">
+            <table class="w-full text-right text-xs sm:text-sm">
+              <thead class="bg-slate-100 text-slate-600 uppercase text-[11px] font-en">
                 <tr>
-                  <th class="p-3">رقم الطلب</th>
-                  <th class="p-3">الموظف</th>
-                  <th class="p-3">البوالص والمواقع</th>
-                  <th class="p-3">الوزن</th>
-                  <th class="p-3">الحالة</th>
-                  <th class="p-3">السيارة</th>
-                  <th class="p-3">إجراء</th>
+                  <th class="p-3">Order ID & Time</th>
+                  <th class="p-3">Employee</th>
+                  <th class="p-3">B/Ls & Location</th>
+                  <th class="p-3">Weight</th>
+                  <th class="p-3">Status</th>
+                  <th class="p-3">Vehicle</th>
+                  <th class="p-3 text-center">Action</th>
                 </tr>
               </thead>
-              <tbody id="ordersTableBody" class="divide-y divide-gray-200">
+              <tbody id="ordersTableBody" class="divide-y divide-slate-200">
               </tbody>
             </table>
           </div>
         </div>
       </div>
 
-      <!-- 2. تبويب المستودع -->
+      <!-- 2. Warehouse -->
       <div id="section-warehouse" class="hidden space-y-6">
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <h2 class="text-base font-bold text-gray-800 mb-4 pb-2 border-b">الطلبات الواردة للتحجيم</h2>
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <h2 class="text-base font-extrabold text-slate-800 mb-4 pb-2 border-b font-en">Incoming Tahjeem Orders</h2>
           <div id="warehouseCards" class="grid grid-cols-1 md:grid-cols-2 gap-6">
           </div>
         </div>
       </div>
 
-      <!-- 3. تبويب الإنتاجية -->
+      <!-- 3. KPIs & Stats -->
       <div id="section-stats" class="hidden space-y-6">
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           <div class="flex justify-between items-center mb-6 border-b pb-4 flex-wrap gap-4">
             <div>
-              <h2 class="text-lg font-extrabold text-blue-900">📊 تقرير إنجاز الموظفين</h2>
-              <p class="text-xs text-gray-500">حساب عدد البوالص المنجزة وعدد السيارات المطبوعة (الطلب = سيارة)</p>
+              <h2 class="text-lg font-black text-blue-950 font-en">Employee Productivity Report</h2>
+              <p class="text-xs text-slate-500 font-en">Each trip order counts as 1 Car. Total B/Ls completed tracked accurately.</p>
             </div>
-            <button onclick="exportStatsToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow transition">
-              📊 تصدير Excel
+            <button onclick="exportStatsToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow transition font-en">
+              Export Stats (Excel)
             </button>
           </div>
           <div id="statsCardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -258,53 +257,51 @@
         </div>
       </div>
 
-      <!-- 4. تبويب الأرشيف وإدارة السجلات ومسح الداتا -->
+      <!-- 4. Archive & Data Management -->
       <div id="section-archive" class="hidden space-y-6">
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           
           <div class="flex justify-between items-center mb-6 flex-wrap gap-4 border-b pb-4">
             <div>
-              <h2 class="text-lg font-extrabold text-blue-900">📁 الأرشيف الشامل وإدارة السجلات</h2>
-              <p class="text-xs text-gray-500 mt-0.5">البحث، التصدير، وتنظيف قاعدة البيانات</p>
+              <h2 class="text-lg font-black text-blue-950 font-en">Archive & System Database</h2>
+              <p class="text-xs text-slate-500 font-en">Search records, export data, and manage storage quota.</p>
             </div>
             
-            <!-- أزرار إدارة ومسح الداتا -->
-            <div class="flex flex-wrap items-center gap-2">
-              <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow transition">
-                📊 تصدير Excel
+            <div class="flex flex-wrap items-center gap-2 font-en text-xs">
+              <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 rounded-lg shadow transition">
+                Export Excel
               </button>
-              <button onclick="cleanOldOrders(7)" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow transition">
-                🧹 حذف أقدم من أسبوع
+              <button onclick="cleanOldOrders(7)" class="bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-2 rounded-lg shadow transition">
+                Purge &gt; 7 Days
               </button>
-              <button onclick="cleanOldOrders(30)" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow transition">
-                🗑️ حذف أقدم من شهر
+              <button onclick="cleanOldOrders(30)" class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-2 rounded-lg shadow transition">
+                Purge &gt; 30 Days
               </button>
-              <button onclick="exportAndClearAll()" class="bg-red-800 hover:bg-black text-white text-xs font-black px-3 py-2 rounded-lg shadow transition">
-                ⚠️ تفريغ كامل الأرشيف
+              <button onclick="exportAndClearAll()" class="bg-red-800 hover:bg-black text-white font-extrabold px-3 py-2 rounded-lg shadow transition">
+                Clear All Database
               </button>
             </div>
           </div>
 
-          <!-- البحث السريع -->
           <div class="mb-4">
-            <input type="text" id="archiveSearchInput" oninput="filterArchive()" placeholder="🔍 ابحث برقم البوليصة، ALV، رقم الطلب، شركة التخليص، أو اسم الموظف..." class="w-full border-2 border-blue-100 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-600 shadow-sm">
+            <input type="text" id="archiveSearchInput" oninput="filterArchive()" placeholder="Search B/L No., ALV Serial, Order ID, Clearance Co., or Employee..." class="w-full border-2 border-slate-200 rounded-xl p-3 text-xs sm:text-sm focus:outline-none focus:border-blue-600 shadow-sm font-en">
           </div>
 
-          <div class="overflow-x-auto rounded-xl border border-gray-200">
-            <table class="w-full text-right text-xs md:text-sm">
-              <thead class="bg-blue-900 text-white uppercase text-xs">
+          <div class="overflow-x-auto rounded-xl border border-slate-200">
+            <table class="w-full text-right text-xs sm:text-sm">
+              <thead class="bg-blue-900 text-white uppercase text-[11px] font-en">
                 <tr>
-                  <th class="p-3">رقم الطلب والتاريخ</th>
-                  <th class="p-3">الموظف</th>
-                  <th class="p-3">البوالص وتفاصيلها</th>
-                  <th class="p-3">الوزن</th>
-                  <th class="p-3">الأبعاد</th>
-                  <th class="p-3">السيارة</th>
-                  <th class="p-3">الحالة والملاحظات</th>
-                  <th class="p-3 text-center">إجراء</th>
+                  <th class="p-3">Order ID & Date/Time</th>
+                  <th class="p-3">Staff</th>
+                  <th class="p-3">B/Ls & Locations</th>
+                  <th class="p-3">Weight</th>
+                  <th class="p-3">Dimensions (L×W×H)</th>
+                  <th class="p-3">Vehicle</th>
+                  <th class="p-3">Status</th>
+                  <th class="p-3 text-center">Print</th>
                 </tr>
               </thead>
-              <tbody id="archiveTableBody" class="divide-y divide-gray-200 bg-white">
+              <tbody id="archiveTableBody" class="divide-y divide-slate-200 bg-white">
               </tbody>
             </table>
           </div>
@@ -320,40 +317,50 @@
     let usersList = [];
     let currentUser = null;
 
-    // تبديل واجهة الدخول
+    // دالة تنسيق الوقت والتاريخ بالإنجليزية بنظام 12 ساعة بدون ثوانٍ (hh:mm AM/PM)
+    function formatTime12(dateObj) {
+      return dateObj.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    }
+
+    function formatDateEn(dateObj) {
+      return dateObj.toLocaleDateString('en-GB'); // DD/MM/YYYY
+    }
+
     function switchAuthMode(mode) {
       document.getElementById('authError').classList.add('hidden');
       if (mode === 'login') {
         document.getElementById('formLogin').classList.remove('hidden');
         document.getElementById('formRegister').classList.add('hidden');
         document.getElementById('btnAuthLogin').className = "py-2 rounded-lg bg-blue-900 text-white shadow transition";
-        document.getElementById('btnAuthRegister').className = "py-2 rounded-lg text-gray-600 hover:text-blue-900 transition";
+        document.getElementById('btnAuthRegister').className = "py-2 rounded-lg text-slate-600 hover:text-blue-900 transition";
       } else {
         document.getElementById('formLogin').classList.add('hidden');
         document.getElementById('formRegister').classList.remove('hidden');
         document.getElementById('btnAuthRegister').className = "py-2 rounded-lg bg-blue-900 text-white shadow transition";
-        document.getElementById('btnAuthLogin').className = "py-2 rounded-lg text-gray-600 hover:text-blue-900 transition";
+        document.getElementById('btnAuthLogin').className = "py-2 rounded-lg text-slate-600 hover:text-blue-900 transition";
       }
     }
 
-    // جلب قائمة الموظفين
     async function loadUsersList() {
       try {
         const res = await fetch('/api/users/list');
         usersList = await res.json();
         const select = document.getElementById('loginUserSelect');
         if (usersList.length === 0) {
-          select.innerHTML = '<option value="">-- لا يوجد موظفون (سجل حسابك الآن) --</option>';
+          select.innerHTML = '<option value="">-- No users found (Create New Account) --</option>';
         } else {
-          select.innerHTML = '<option value="">-- اضغط لاختيار اسمك --</option>' + 
-            usersList.map(u => `<option value="${u.id}">${u.name} (${u.role === 'cs' ? 'خدمة عملاء' : 'مستودع'})</option>`).join('');
+          select.innerHTML = '<option value="">-- Select Employee Name --</option>' + 
+            usersList.map(u => `<option value="${u.id}">${u.name} (${u.role === 'cs' ? 'Customer Service' : 'Warehouse'})</option>`).join('');
         }
       } catch (e) {
         console.error(e);
       }
     }
 
-    // فحص الجلسة عند البداية
     function checkAuth() {
       const saved = localStorage.getItem('tahjeem_user');
       if (saved) {
@@ -361,7 +368,7 @@
         document.getElementById('loginOverlay').classList.add('hidden');
         document.getElementById('mainApp').classList.remove('hidden');
         document.getElementById('navUserName').innerText = currentUser.name;
-        document.getElementById('navUserRole').innerText = currentUser.role === 'cs' ? 'خدمة عملاء' : 'مستودع';
+        document.getElementById('navUserRole').innerText = currentUser.role === 'cs' ? 'Customer Service' : 'Warehouse';
         loadData();
       } else {
         document.getElementById('loginOverlay').classList.remove('hidden');
@@ -370,7 +377,6 @@
       }
     }
 
-    // تنفيذ تسجيل الدخول
     async function performLogin() {
       const userId = document.getElementById('loginUserSelect').value;
       const password = document.getElementById('loginPassword').value.trim();
@@ -378,12 +384,12 @@
       errBox.classList.add('hidden');
 
       if (!userId) {
-        errBox.innerText = 'يرجى اختيار اسم الموظف';
+        errBox.innerText = 'Please select your employee name';
         errBox.classList.remove('hidden');
         return;
       }
       if (!password) {
-        errBox.innerText = 'يرجى كتابة كلمة المرور';
+        errBox.innerText = 'Please enter your password';
         errBox.classList.remove('hidden');
         return;
       }
@@ -395,7 +401,7 @@
           body: JSON.stringify({ userId, password })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'فشل تسجيل الدخول');
+        if (!res.ok) throw new Error(data.error || 'Login failed');
 
         currentUser = data.user;
         localStorage.setItem('tahjeem_user', JSON.stringify(currentUser));
@@ -406,7 +412,6 @@
       }
     }
 
-    // تنفيذ إنشاء الحساب
     async function performRegister() {
       const name = document.getElementById('regName').value.trim();
       const role = document.getElementById('regRole').value;
@@ -416,17 +421,17 @@
       errBox.classList.add('hidden');
 
       if (!name) {
-        errBox.innerText = 'يرجى إدخال اسمك الكامل';
+        errBox.innerText = 'Please enter employee name';
         errBox.classList.remove('hidden');
         return;
       }
       if (password.length < 8) {
-        errBox.innerText = 'كلمة المرور يجب ألا تقل عن 8 خانات';
+        errBox.innerText = 'Password must be at least 8 characters long';
         errBox.classList.remove('hidden');
         return;
       }
       if (password !== passwordConfirm) {
-        errBox.innerText = 'كلمة المرور وتأكيدها غير متطابقين';
+        errBox.innerText = 'Passwords do not match';
         errBox.classList.remove('hidden');
         return;
       }
@@ -438,7 +443,7 @@
           body: JSON.stringify({ name, role, password })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'فشل إنشاء الحساب');
+        if (!res.ok) throw new Error(data.error || 'Registration failed');
 
         currentUser = data.user;
         localStorage.setItem('tahjeem_user', JSON.stringify(currentUser));
@@ -478,25 +483,25 @@
       document.getElementById('section-stats').classList.add('hidden');
       document.getElementById('section-archive').classList.add('hidden');
 
-      document.getElementById('tab-cs').className = "py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition";
-      document.getElementById('tab-wh').className = "py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition";
-      document.getElementById('tab-stats').className = "py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition";
-      document.getElementById('tab-arc').className = "py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition";
+      const tabs = ['cs', 'wh', 'stats', 'arc'];
+      tabs.forEach(t => {
+        document.getElementById(`tab-${t}`).className = "py-3 px-5 font-bold text-slate-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition";
+      });
 
       if (tab === 'cs') {
         document.getElementById('section-cs').classList.remove('hidden');
-        document.getElementById('tab-cs').className = "py-3 px-6 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition";
+        document.getElementById('tab-cs').className = "py-3 px-5 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition";
       } else if (tab === 'warehouse') {
         document.getElementById('section-warehouse').classList.remove('hidden');
-        document.getElementById('tab-wh').className = "py-3 px-6 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition";
+        document.getElementById('tab-wh').className = "py-3 px-5 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition";
         renderWarehouse();
       } else if (tab === 'stats') {
         document.getElementById('section-stats').classList.remove('hidden');
-        document.getElementById('tab-stats').className = "py-3 px-6 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition";
+        document.getElementById('tab-stats').className = "py-3 px-5 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition";
         loadStats();
       } else if (tab === 'archive') {
         document.getElementById('section-archive').classList.remove('hidden');
-        document.getElementById('tab-arc').className = "py-3 px-6 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition";
+        document.getElementById('tab-arc').className = "py-3 px-5 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition";
         renderArchive();
       }
     }
@@ -534,7 +539,7 @@
       if (!file) return;
 
       const btnLabel = document.getElementById(`btn-ocr-${index}`);
-      btnLabel.innerHTML = '<span>⏳</span>';
+      btnLabel.innerHTML = '<span>⏳ Processing...</span>';
       btnLabel.classList.add('opacity-75');
 
       const formData = new FormData();
@@ -555,18 +560,17 @@
 
         calcTotalWeight();
       } catch (err) {
-        alert('تنبيه: ' + err.message);
+        alert('OCR Alert: ' + err.message);
       } finally {
         btnLabel.innerHTML = '<span>📷</span><input type="file" accept="image/*" class="hidden" onchange="handleOCR(event, ' + index + ')">';
         btnLabel.classList.remove('opacity-75');
       }
     }
 
-    // طباعة إشعار فوري وحفظ السجل
     async function handleManualPrintAndSave() {
       const bls = getFilledBLs();
       if (bls.length === 0) {
-        alert('يرجى إدخال بيانات بوليصة واحدة على الأقل');
+        alert('Please enter at least 1 B/L to print slip');
         return;
       }
       const totalWeight = parseFloat(document.getElementById('totalWeightDisplay').innerText) || 0;
@@ -579,7 +583,7 @@
         body: JSON.stringify({
           bls,
           totalWeight,
-          createdBy: currentUser ? currentUser.name : 'خدمة العملاء',
+          createdBy: currentUser ? currentUser.name : 'Customer Service',
           isManual: true
         })
       });
@@ -591,7 +595,7 @@
     async function submitOrder() {
       const bls = getFilledBLs();
       if (bls.length === 0) {
-        alert('يرجى إدخال بيانات بوليصة واحدة على الأقل');
+        alert('Please enter at least 1 B/L');
         return;
       }
 
@@ -603,14 +607,14 @@
         body: JSON.stringify({
           bls,
           totalWeight,
-          createdBy: currentUser ? currentUser.name : 'خدمة العملاء',
+          createdBy: currentUser ? currentUser.name : 'Customer Service',
           isManual: false
         })
       });
 
       clearInputs();
       loadData();
-      alert('تم إرسال الطلب للمستودع بنجاح 🚀');
+      alert('Order dispatched to Warehouse successfully 🚀');
     }
 
     function clearInputs() {
@@ -626,9 +630,11 @@
       calcTotalWeight();
     }
 
+    // ورقة الطباعة الرسمية متضمنة التاريخ والوقت الإنجليزي بنظام 12 ساعة بدون ثوانٍ
     function printFormalSlip(orderId) {
       let clearanceCompany = '';
       let dateStr = '';
+      let timeStr = '';
       let bls = [];
       let totalWeight = '';
       let l = '', w = '', h = '';
@@ -639,7 +645,9 @@
         const order = state.orders.find(o => o.id === orderId);
         if (!order) return;
         clearanceCompany = order.bls.find(b => b.clearanceCompany)?.clearanceCompany || '';
-        dateStr = new Date(order.createdAt).toLocaleDateString('ar-EG');
+        const d = new Date(order.createdAt);
+        dateStr = formatDateEn(d);
+        timeStr = formatTime12(d);
         bls = order.bls;
         totalWeight = order.totalWeight || '';
         l = order.measurements?.length || '';
@@ -650,91 +658,98 @@
       } else {
         bls = getFilledBLs();
         clearanceCompany = bls.find(b => b.clearanceCompany)?.clearanceCompany || '';
-        dateStr = new Date().toLocaleDateString('ar-EG');
+        const d = new Date();
+        dateStr = formatDateEn(d);
+        timeStr = formatTime12(d);
         totalWeight = document.getElementById('totalWeightDisplay').innerText;
       }
 
       const getCheck = (name) => (selectedVeh === name ? '☑' : '☐');
 
-      const printWindow = window.open('', '', 'width=950,height=800');
+      const printWindow = window.open('', '', 'width=950,height=850');
       printWindow.document.write(`
         <html dir="rtl">
         <head>
-          <title>خدمة تحجيم - Aqaba Logistics Village</title>
+          <title>Tahjeem ALV - Logistics Slip</title>
           <style>
             @page { size: A4 portrait; margin: 12mm; }
-            body { font-family: 'Cairo', Tahoma, Arial, sans-serif; padding: 10px; color: #000; line-height: 1.5; font-size: 16px; }
-            .header-title { text-align: center; font-size: 24px; font-weight: 800; margin-bottom: 2px; }
-            .sub-title { text-align: center; font-size: 20px; font-weight: 700; margin-bottom: 22px; }
-            .top-info { display: flex; justify-content: space-between; margin-bottom: 18px; font-size: 17px; font-weight: 600; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 22px; }
-            th, td { border: 2px solid #000; padding: 10px 6px; text-align: center; font-size: 16px; }
-            th { background-color: #f2f2f2; font-weight: 800; font-size: 16px; }
-            .section-weight { margin: 18px 0; font-size: 20px; font-weight: 800; }
-            .section-line { margin: 16px 0; font-size: 16px; font-weight: 600; }
-            .dim-container { margin-top: 18px; }
-            .dim-grid { display: flex; gap: 35px; margin-top: 10px; font-size: 17px; font-weight: 700; }
-            .notes-box { min-height: 55px; border-bottom: 1.5px dashed #444; margin-top: 6px; font-size: 16px; padding-top: 4px; }
+            body { font-family: 'Cairo', Tahoma, Arial, sans-serif; padding: 10px; color: #000; line-height: 1.5; font-size: 15px; }
+            .font-en { font-family: 'Inter', Arial, sans-serif; }
+            .header-title { text-align: center; font-size: 24px; font-weight: 900; margin-bottom: 2px; }
+            .sub-title { text-align: center; font-size: 19px; font-weight: 700; margin-bottom: 20px; color: #333; }
+            .top-info { display: flex; justify-content: space-between; margin-bottom: 18px; font-size: 16px; font-weight: 600; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            th, td { border: 2px solid #000; padding: 8px 6px; text-align: center; font-size: 15px; }
+            th { background-color: #f2f2f2; font-weight: 800; font-size: 15px; }
+            .section-weight { margin: 16px 0; font-size: 19px; font-weight: 800; }
+            .section-line { margin: 14px 0; font-size: 16px; font-weight: 600; }
+            .dim-container { margin-top: 16px; }
+            .dim-grid { display: flex; gap: 35px; margin-top: 8px; font-size: 16px; font-weight: 700; }
+            .notes-box { min-height: 50px; border-bottom: 1.5px dashed #444; margin-top: 6px; font-size: 15px; padding-top: 4px; }
           </style>
         </head>
         <body>
-          <div class="header-title">Aqaba Logistics Village (ALV)</div>
-          <div class="sub-title">خدمة تحجيم</div>
+          <div class="header-title font-en">Aqaba Logistics Village (ALV)</div>
+          <div class="sub-title">إشعار تحجيم بضاعة (Tahjeem Slip)</div>
 
           <div class="top-info">
-            <div><b>شركة التخليص:</b> <u>&nbsp;${clearanceCompany || '_______________________'}&nbsp;</u></div>
-            <div><b>تاريخ الطلب:</b> <u>&nbsp;${dateStr}&nbsp;</u></div>
+            <div><b>شركة التخليص:</b> <u class="font-en">&nbsp;${clearanceCompany || '_______________________'}&nbsp;</u></div>
+            <div>
+              <b>Date / Time:</b> 
+              <u class="font-en">&nbsp;${dateStr} • ${timeStr}&nbsp;</u>
+            </div>
           </div>
 
           <table>
             <thead>
               <tr>
-                <th style="width: 20%;"></th>
-                <th style="width: 22%;">رقم البوليصة</th>
-                <th style="width: 14%;">ALV</th>
-                <th style="width: 13%;">الوزن/طن</th>
-                <th style="width: 10%;">العدد</th>
-                <th style="width: 10%;">عدد البلتات</th>
-                <th style="width: 11%;">موقع التخزين</th>
+                <th style="width: 16%;">Item</th>
+                <th style="width: 24%;">B/L No.</th>
+                <th style="width: 14%;">ALV Serial</th>
+                <th style="width: 12%;">Weight (T)</th>
+                <th style="width: 10%;">QTY</th>
+                <th style="width: 10%;">Pallets</th>
+                <th style="width: 14%;">Location</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td><b>البوليصة (1):</b></td>
-                <td><b>${bls[0]?.blNumber || ''}</b></td>
-                <td>${bls[0]?.alvSerial || ''}</td>
-                <td><b>${bls[0]?.weight || ''}</b></td>
-                <td>${bls[0]?.qty || ''}</td>
-                <td>${bls[0]?.pallets || ''}</td>
-                <td style="font-weight: 800; font-size: 18px;">${bls[0]?.location || ''}</td>
+                <td><b class="font-en">B/L (1)</b></td>
+                <td class="font-en"><b>${bls[0]?.blNumber || ''}</b></td>
+                <td class="font-en">${bls[0]?.alvSerial || ''}</td>
+                <td class="font-en"><b>${bls[0]?.weight || ''}</b></td>
+                <td class="font-en">${bls[0]?.qty || ''}</td>
+                <td class="font-en">${bls[0]?.pallets || ''}</td>
+                <td class="font-en" style="font-weight: 900; font-size: 17px;">${bls[0]?.location || ''}</td>
               </tr>
               <tr>
-                <td><b>البوليصة (2):</b></td>
-                <td><b>${bls[1]?.blNumber || ''}</b></td>
-                <td>${bls[1]?.alvSerial || ''}</td>
-                <td><b>${bls[1]?.weight || ''}</b></td>
-                <td>${bls[1]?.qty || ''}</td>
-                <td>${bls[1]?.pallets || ''}</td>
-                <td style="font-weight: 800; font-size: 18px;">${bls[1]?.location || ''}</td>
+                <td><b class="font-en">B/L (2)</b></td>
+                <td class="font-en"><b>${bls[1]?.blNumber || ''}</b></td>
+                <td class="font-en">${bls[1]?.alvSerial || ''}</td>
+                <td class="font-en"><b>${bls[1]?.weight || ''}</b></td>
+                <td class="font-en">${bls[1]?.qty || ''}</td>
+                <td class="font-en">${bls[1]?.pallets || ''}</td>
+                <td class="font-en" style="font-weight: 900; font-size: 17px;">${bls[1]?.location || ''}</td>
               </tr>
               <tr>
-                <td><b>البوليصة (3):</b></td>
-                <td><b>${bls[2]?.blNumber || ''}</b></td>
-                <td>${bls[2]?.alvSerial || ''}</td>
-                <td><b>${bls[2]?.weight || ''}</b></td>
-                <td>${bls[2]?.qty || ''}</td>
-                <td>${bls[2]?.pallets || ''}</td>
-                <td style="font-weight: 800; font-size: 18px;">${bls[2]?.location || ''}</td>
+                <td><b class="font-en">B/L (3)</b></td>
+                <td class="font-en"><b>${bls[2]?.blNumber || ''}</b></td>
+                <td class="font-en">${bls[2]?.alvSerial || ''}</td>
+                <td class="font-en"><b>${bls[2]?.weight || ''}</b></td>
+                <td class="font-en">${bls[2]?.qty || ''}</td>
+                <td class="font-en">${bls[2]?.pallets || ''}</td>
+                <td class="font-en" style="font-weight: 900; font-size: 17px;">${bls[2]?.location || ''}</td>
               </tr>
             </tbody>
           </table>
 
           <div class="section-weight">
-            الوزن الكلي (طن): &nbsp;&nbsp;&nbsp; <u style="font-size: 22px;">&nbsp;${totalWeight ? totalWeight + ' طن' : '___________________'}&nbsp;</u>
+            الوزن الإجمالي (Total Weight): &nbsp;&nbsp;&nbsp; 
+            <u class="font-en" style="font-size: 20px;">&nbsp;${totalWeight ? totalWeight + ' Tons' : '___________________'}&nbsp;</u>
           </div>
 
-          <div class="section-line" style="margin-top: 18px;">
-            <b>نوع السيارة:</b> &nbsp;&nbsp;&nbsp;
+          <div class="section-line">
+            <b>Vehicle Type (نوع السيارة):</b> &nbsp;&nbsp;&nbsp;
             ${getCheck('ديانا')} ديانا &nbsp;&nbsp;&nbsp;&nbsp;
             ${getCheck('بنقو')} بنقو &nbsp;&nbsp;&nbsp;&nbsp;
             ${getCheck('LB')} LB &nbsp;&nbsp;&nbsp;&nbsp;
@@ -743,16 +758,16 @@
           </div>
 
           <div class="dim-container">
-            <div style="font-weight: 800; font-size: 17px; margin-bottom: 6px;">أبعاد الشحنة كاملة (م):</div>
-            <div class="dim-grid">
-              <div>الطول: <u>&nbsp;${l ? l + ' م' : '___________'}&nbsp;</u></div>
-              <div>العرض: <u>&nbsp;${w ? w + ' م' : '___________'}&nbsp;</u></div>
-              <div>الارتفاع: <u>&nbsp;${h ? h + ' م' : '___________'}&nbsp;</u></div>
+            <div style="font-weight: 800; font-size: 16px; margin-bottom: 4px;">Cargo Dimensions (أبعاد الشحنة كاملة):</div>
+            <div class="dim-grid font-en">
+              <div>Length: <u>&nbsp;${l ? l + ' m' : '___________'}&nbsp;</u></div>
+              <div>Width: <u>&nbsp;${w ? w + ' m' : '___________'}&nbsp;</u></div>
+              <div>Height: <u>&nbsp;${h ? h + ' m' : '___________'}&nbsp;</u></div>
             </div>
           </div>
 
-          <div style="margin-top: 22px;">
-            <b style="font-size: 16px;">ملاحظات:</b>
+          <div style="margin-top: 18px;">
+            <b style="font-size: 15px;">Warehouse Notes (ملاحظات التحجيم):</b>
             <div class="notes-box">${notes}</div>
           </div>
 
@@ -765,21 +780,34 @@
     function renderOrders() {
       const tbody = document.getElementById('ordersTableBody');
       tbody.innerHTML = state.orders.map(order => {
-        const blDetails = order.bls.map(b => `<div class="font-semibold text-blue-900">${b.blNumber} <span class="text-xs text-gray-500">(${b.location || 'بلا موقع'})</span></div>`).join('');
+        const d = new Date(order.createdAt);
+        const timeDisplay = `${formatDateEn(d)} • ${formatTime12(d)}`;
+
+        const blDetails = order.bls.map((b, idx) => `
+          <div class="font-bold text-blue-950 font-mono text-xs">
+            <span class="text-slate-400 font-sans">B/L (${idx+1}):</span> ${b.blNumber} 
+            <span class="text-rose-600 bg-rose-50 px-1 rounded mr-1">(${b.location || 'No Loc'})</span>
+          </div>
+        `).join('');
+
         const isDone = order.status === 'تم التحجيم';
         const isManual = order.status === 'طباعة يدوية';
         const badgeClass = isDone ? 'badge-done' : (isManual ? 'badge-manual' : 'badge-tahjeem');
+        const statusEn = isDone ? 'Completed' : (isManual ? 'Manual Printed' : 'Pending Tahjeem');
 
         return `
-          <tr class="hover:bg-gray-50">
-            <td class="p-3 font-mono font-bold">${order.id}<br><span class="text-xs text-gray-400 font-normal">${new Date(order.createdAt).toLocaleTimeString('ar-EG')}</span></td>
-            <td class="p-3 font-semibold text-gray-700">${order.createdBy || '-'}</td>
-            <td class="p-3">${blDetails}</td>
-            <td class="p-3 font-bold text-gray-800">${order.totalWeight} طن</td>
-            <td class="p-3"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeClass}">${order.status}</span></td>
-            <td class="p-3 font-bold text-indigo-700">${order.vehicleType || '-'}</td>
+          <tr class="hover:bg-slate-50 transition">
             <td class="p-3">
-              <button onclick="printFormalSlip('${order.id}')" class="bg-gray-800 hover:bg-black text-white px-3 py-1 rounded-lg text-xs font-bold shadow">🖨️ طباعة</button>
+              <div class="font-mono font-bold text-blue-900">${order.id}</div>
+              <div class="text-[11px] text-slate-500 font-en font-semibold">${timeDisplay}</div>
+            </td>
+            <td class="p-3 font-semibold text-slate-700 font-en">${order.createdBy || '-'}</td>
+            <td class="p-3">${blDetails}</td>
+            <td class="p-3 font-black text-slate-800 font-en whitespace-nowrap">${order.totalWeight} T</td>
+            <td class="p-3"><span class="px-2.5 py-1 rounded-full text-xs font-bold font-en ${badgeClass}">${statusEn}</span></td>
+            <td class="p-3 font-bold text-indigo-700 font-en whitespace-nowrap">${order.vehicleType || '-'}</td>
+            <td class="p-3 text-center whitespace-nowrap">
+              <button onclick="printFormalSlip('${order.id}')" class="bg-slate-800 hover:bg-black text-white px-3 py-1 rounded-lg text-xs font-bold font-en shadow">🖨️ Re-Print</button>
             </td>
           </tr>
         `;
@@ -790,7 +818,7 @@
       const container = document.getElementById('warehouseCards');
       const pending = state.orders.filter(o => o.status === 'بانتظار التحجيم');
       if (pending.length === 0) {
-        container.innerHTML = '<div class="col-span-2 text-center text-gray-400 py-8 font-bold">لا توجد طلبات معلقة حالياً ✅</div>';
+        container.innerHTML = '<div class="col-span-2 text-center text-slate-400 py-8 font-bold font-en">No pending orders in queue ✅</div>';
         return;
       }
 
@@ -803,45 +831,51 @@
         currentValues[`notes-${o.id}`] = document.getElementById(`m-notes-${o.id}`)?.value || '';
       });
 
-      container.innerHTML = pending.map(order => `
-        <div class="border-2 border-yellow-400 bg-yellow-50/30 rounded-2xl p-5 shadow space-y-4">
+      container.innerHTML = pending.map(order => {
+        const d = new Date(order.createdAt);
+        const timeDisplay = `${formatDateEn(d)} • ${formatTime12(d)}`;
+
+        return `
+        <div class="border-2 border-amber-400 bg-amber-50/20 rounded-2xl p-5 shadow-sm space-y-4">
           <div class="flex justify-between items-center border-b pb-2">
             <div>
-              <span class="font-extrabold text-blue-900 text-lg">${order.id}</span>
-              <span class="text-xs text-gray-500 mr-2">بواسطة: ${order.createdBy}</span>
+              <span class="font-black text-blue-950 text-base font-mono">${order.id}</span>
+              <div class="text-[11px] text-slate-500 font-en">By: ${order.createdBy} • ${timeDisplay}</div>
             </div>
-            <span class="text-xs bg-yellow-200 text-yellow-800 font-bold px-2 py-1 rounded">الوزن: ${order.totalWeight} طن</span>
+            <span class="text-xs bg-amber-200 text-amber-900 font-extrabold px-2.5 py-1 rounded font-en">${order.totalWeight} Tons</span>
           </div>
-          <div class="space-y-3">
+
+          <div class="space-y-2.5">
             ${order.bls.map((b, idx) => `
-              <div class="bg-white p-3 rounded-xl border text-sm shadow-sm space-y-1.5">
+              <div class="bg-white p-3 rounded-xl border text-xs shadow-sm space-y-1 font-en">
                 <div class="flex justify-between items-center border-b pb-1">
-                  <div><span class="text-gray-500 text-xs">البوليصة (${idx + 1}):</span> <b class="text-blue-900 text-base">${b.blNumber}</b></div>
-                  <div class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-bold">ALV: ${b.alvSerial || '-'}</div>
+                  <div><span class="text-slate-500">B/L (${idx + 1}):</span> <b class="text-blue-900 font-mono text-sm">${b.blNumber}</b></div>
+                  <div class="bg-blue-100 text-blue-900 px-2 py-0.5 rounded font-mono font-bold">ALV: ${b.alvSerial || '-'}</div>
                 </div>
-                <div class="grid grid-cols-2 gap-2 pt-1">
-                  <div><span class="text-gray-500 text-xs">الموقع:</span> <b class="text-red-600 text-base bg-red-50 px-1 rounded">${b.location || 'غير محدد'}</b></div>
-                  <div><span class="text-gray-500 text-xs">الوزن:</span> <b>${b.weight} طن</b></div>
-                  <div><span class="text-gray-500 text-xs">العدد:</span> <b>${b.qty || '-'}</b></div>
-                  <div><span class="text-gray-500 text-xs">البلتات:</span> <b>${b.pallets || '-'}</b></div>
+                <div class="grid grid-cols-4 gap-2 pt-1 font-semibold">
+                  <div>Location: <b class="text-rose-600 bg-rose-50 px-1 rounded">${b.location || 'N/A'}</b></div>
+                  <div>Weight: <b>${b.weight} T</b></div>
+                  <div>QTY: <b>${b.qty || '-'}</b></div>
+                  <div>Pallets: <b>${b.pallets || '-'}</b></div>
                 </div>
-                ${b.clearanceCompany ? `<div class="text-xs text-gray-500 pt-1 border-t">التخليص: <span class="font-semibold text-gray-700">${b.clearanceCompany}</span></div>` : ''}
+                ${b.clearanceCompany ? `<div class="text-[11px] text-slate-500 pt-0.5 border-t">Co: ${b.clearanceCompany}</div>` : ''}
               </div>
             `).join('')}
           </div>
-          <div class="bg-white p-4 rounded-xl border space-y-3">
-            <div class="font-bold text-sm text-gray-700">الأبعاد (متر):</div>
+
+          <div class="bg-white p-4 rounded-xl border space-y-3 font-en">
+            <div class="font-extrabold text-xs text-slate-700 uppercase tracking-wider">Cargo Dimensions (Meters):</div>
             <div class="grid grid-cols-3 gap-2">
-              <input type="number" step="0.01" id="m-l-${order.id}" value="${currentValues[`l-${order.id}`] || ''}" placeholder="الطول" class="border rounded-lg p-2 text-center text-sm font-bold">
-              <input type="number" step="0.01" id="m-w-${order.id}" value="${currentValues[`w-${order.id}`] || ''}" placeholder="العرض" class="border rounded-lg p-2 text-center text-sm font-bold">
-              <input type="number" step="0.01" id="m-h-${order.id}" value="${currentValues[`h-${order.id}`] || ''}" placeholder="الارتفاع" class="border rounded-lg p-2 text-center text-sm font-bold">
+              <input type="number" step="0.01" id="m-l-${order.id}" value="${currentValues[`l-${order.id}`] || ''}" placeholder="Length (L)" class="border rounded-lg p-2 text-center text-xs sm:text-sm font-bold">
+              <input type="number" step="0.01" id="m-w-${order.id}" value="${currentValues[`w-${order.id}`] || ''}" placeholder="Width (W)" class="border rounded-lg p-2 text-center text-xs sm:text-sm font-bold">
+              <input type="number" step="0.01" id="m-h-${order.id}" value="${currentValues[`h-${order.id}`] || ''}" placeholder="Height (H)" class="border rounded-lg p-2 text-center text-xs sm:text-sm font-bold">
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
               <div>
-                <label class="block text-xs font-semibold text-gray-600 mb-1">نوع السيارة:</label>
-                <select id="m-veh-${order.id}" class="w-full border rounded-lg p-2 text-sm font-bold bg-gray-50">
-                  <option value="">-- اختياري --</option>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Vehicle Type:</label>
+                <select id="m-veh-${order.id}" class="w-full border rounded-lg p-2 text-xs sm:text-sm font-bold bg-slate-50">
+                  <option value="">-- Select Vehicle --</option>
                   <option value="ديانا" ${currentValues[`veh-${order.id}`] === 'ديانا' ? 'selected' : ''}>ديانا</option>
                   <option value="بنقو" ${currentValues[`veh-${order.id}`] === 'بنقو' ? 'selected' : ''}>بنقو</option>
                   <option value="LB" ${currentValues[`veh-${order.id}`] === 'LB' ? 'selected' : ''}>LB</option>
@@ -850,19 +884,20 @@
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-semibold text-gray-600 mb-1">ملاحظات:</label>
-                <input type="text" id="m-notes-${order.id}" value="${currentValues[`notes-${order.id}`] || ''}" placeholder="أية ملاحظات..." class="w-full border rounded-lg p-2 text-sm">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Warehouse Notes:</label>
+                <input type="text" id="m-notes-${order.id}" value="${currentValues[`notes-${order.id}`] || ''}" placeholder="Any remarks..." class="w-full border rounded-lg p-2 text-xs sm:text-sm">
               </div>
             </div>
 
             <div class="pt-2">
-              <button onclick="saveTahjeemOrder('${order.id}')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm transition shadow">
-                💾 حفظ واعتماد
+              <button onclick="saveTahjeemOrder('${order.id}')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs sm:text-sm transition shadow">
+                💾 Save & Complete Tahjeem
               </button>
             </div>
           </div>
         </div>
-      `).join('');
+      `;
+      }).join('');
     }
 
     async function saveTahjeemOrder(id) {
@@ -879,7 +914,7 @@
           measurements: { length: l, width: w, height: h },
           vehicleType,
           shareefNotes,
-          measuredBy: currentUser ? currentUser.name : 'موظف المستودع'
+          measuredBy: currentUser ? currentUser.name : 'Warehouse Staff'
         })
       });
       loadData();
@@ -891,27 +926,27 @@
       const container = document.getElementById('statsCardsContainer');
 
       if (Object.keys(stats).length === 0) {
-        container.innerHTML = '<div class="col-span-3 text-center py-8 text-gray-400 font-bold">لا توجد بيانات إحصائية حتى الآن</div>';
+        container.innerHTML = '<div class="col-span-3 text-center py-8 text-slate-400 font-bold font-en">No KPI data recorded yet</div>';
         return;
       }
 
       container.innerHTML = Object.entries(stats).map(([name, data]) => `
-        <div class="bg-gradient-to-br from-white to-gray-50 p-6 rounded-2xl border border-gray-200 shadow space-y-4">
-          <div class="flex justify-between items-center border-b pb-3">
+        <div class="bg-gradient-to-br from-white to-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex justify-between items-center border-b pb-3 font-en">
             <div>
-              <h3 class="font-bold text-lg text-blue-900">${name}</h3>
-              <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md font-semibold">${data.role}</span>
+              <h3 class="font-black text-lg text-blue-950">${name}</h3>
+              <span class="text-xs bg-blue-100 text-blue-900 px-2 py-0.5 rounded-md font-bold uppercase">${data.role}</span>
             </div>
             <div class="text-2xl">👤</div>
           </div>
-          <div class="grid grid-cols-2 gap-4 text-center pt-2">
+          <div class="grid grid-cols-2 gap-3 text-center pt-2 font-en">
             <div class="bg-blue-50 p-4 rounded-xl border border-blue-200">
-              <span class="text-xs text-gray-600 font-bold block mb-1">📋 البوالص المنجزة</span>
+              <span class="text-xs text-slate-600 font-bold block mb-1">Total B/Ls Done</span>
               <span class="text-3xl font-black text-blue-700">${data.totalBLs}</span>
             </div>
-            <div class="bg-green-50 p-4 rounded-xl border border-green-200">
-              <span class="text-xs text-gray-600 font-bold block mb-1">🚚 السيارات المطبوعة</span>
-              <span class="text-3xl font-black text-green-700">${data.totalCars}</span>
+            <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-200">
+              <span class="text-xs text-slate-600 font-bold block mb-1">Total Trips / Cars</span>
+              <span class="text-3xl font-black text-emerald-700">${data.totalCars}</span>
             </div>
           </div>
         </div>
@@ -921,15 +956,15 @@
     function exportStatsToExcel() {
       fetch('/api/stats').then(r => r.json()).then(stats => {
         const data = Object.entries(stats).map(([name, d]) => ({
-          'اسم الموظف': name,
-          'الدور': d.role,
-          'عدد البوالص المنجزة': d.totalBLs,
-          'عدد السيارات المطبوعة': d.totalCars
+          'Employee': name,
+          'Department': d.role,
+          'Total B/Ls Completed': d.totalBLs,
+          'Total Trips / Cars': d.totalCars
         }));
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "الإنتاجية");
-        XLSX.writeFile(wb, `انتاجية_الموظفين_${new Date().toISOString().slice(0,10)}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, "KPIs");
+        XLSX.writeFile(wb, `Tahjeem_ALV_KPIs_${new Date().toISOString().slice(0,10)}.xlsx`);
       });
     }
 
@@ -938,48 +973,52 @@
       const ordersToDisplay = filteredOrders || state.orders;
 
       if (ordersToDisplay.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center p-8 text-gray-400 font-bold">لا توجد بيانات مطابقة في الأرشيف</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center p-8 text-slate-400 font-bold font-en">No archive records found</td></tr>`;
         return;
       }
 
       tbody.innerHTML = ordersToDisplay.map(order => {
+        const d = new Date(order.createdAt);
+        const timeDisplay = `${formatDateEn(d)} • ${formatTime12(d)}`;
+
         const blsRows = order.bls.map((b, i) => `
-          <div class="mb-1 pb-1 border-b border-gray-100 last:border-0">
-            <span class="font-bold text-blue-900">${b.blNumber}</span> 
-            | <span class="text-gray-600">ALV: ${b.alvSerial || '-'}</span>
-            | <span class="text-red-600 font-bold">${b.location || '-'}</span>
-            ${b.clearanceCompany ? `| <span class="text-xs text-gray-500 font-semibold">${b.clearanceCompany}</span>` : ''}
+          <div class="mb-1 pb-1 border-b border-slate-100 last:border-0 font-en text-xs">
+            <b class="text-blue-950 font-mono">B/L (${i+1}): ${b.blNumber}</b> 
+            | <span class="text-slate-500 font-mono">ALV: ${b.alvSerial || '-'}</span>
+            | <span class="text-rose-600 font-bold">${b.location || '-'}</span>
+            ${b.clearanceCompany ? `| <span class="text-slate-600 font-semibold">${b.clearanceCompany}</span>` : ''}
           </div>
         `).join('');
 
         const dims = order.measurements?.length 
-          ? `<div class="font-mono text-xs font-bold text-gray-700">${order.measurements.length} × ${order.measurements.width} × ${order.measurements.height} م</div>` 
-          : '<span class="text-gray-400 text-xs">-</span>';
+          ? `<div class="font-mono text-xs font-bold text-slate-700">${order.measurements.length} × ${order.measurements.width} × ${order.measurements.height} m</div>` 
+          : '<span class="text-slate-400 text-xs font-en">-</span>';
 
         const isDone = order.status === 'تم التحجيم';
         const isManual = order.status === 'طباعة يدوية';
         const badgeClass = isDone ? 'badge-done' : (isManual ? 'badge-manual' : 'badge-tahjeem');
+        const statusEn = isDone ? 'Completed' : (isManual ? 'Manual Printed' : 'Pending Tahjeem');
 
         return `
-          <tr class="hover:bg-blue-50/50 transition">
+          <tr class="hover:bg-blue-50/40 transition">
             <td class="p-3">
               <div class="font-mono font-bold text-blue-900">${order.id}</div>
-              <div class="text-xs text-gray-500">${new Date(order.createdAt).toLocaleDateString('ar-EG')} - ${new Date(order.createdAt).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})}</div>
+              <div class="text-[11px] text-slate-500 font-en font-semibold">${timeDisplay}</div>
             </td>
             <td class="p-3">
-              <div class="font-bold text-gray-800">${order.createdBy || '-'}</div>
-              ${order.measuredBy ? `<div class="text-[11px] text-gray-400">حجّمها: ${order.measuredBy}</div>` : ''}
+              <div class="font-bold text-slate-800 font-en">${order.createdBy || '-'}</div>
+              ${order.measuredBy ? `<div class="text-[10px] text-slate-400 font-en">WH: ${order.measuredBy}</div>` : ''}
             </td>
             <td class="p-3">${blsRows}</td>
-            <td class="p-3 font-bold text-gray-900 whitespace-nowrap">${order.totalWeight} طن</td>
+            <td class="p-3 font-bold text-slate-900 whitespace-nowrap font-en">${order.totalWeight} T</td>
             <td class="p-3 whitespace-nowrap">${dims}</td>
-            <td class="p-3 font-bold text-indigo-700 whitespace-nowrap">${order.vehicleType || '-'}</td>
+            <td class="p-3 font-bold text-indigo-700 whitespace-nowrap font-en">${order.vehicleType || '-'}</td>
             <td class="p-3">
-              <span class="px-2 py-0.5 rounded-full text-xs font-bold ${badgeClass}">${order.status}</span>
-              ${order.shareefNotes ? `<div class="text-xs text-gray-500 mt-1 italic max-w-xs">📝 ${order.shareefNotes}</div>` : ''}
+              <span class="px-2 py-0.5 rounded-full text-xs font-bold font-en ${badgeClass}">${statusEn}</span>
+              ${order.shareefNotes ? `<div class="text-xs text-slate-500 mt-1 italic max-w-xs">📝 ${order.shareefNotes}</div>` : ''}
             </td>
             <td class="p-3 text-center whitespace-nowrap">
-              <button onclick="printFormalSlip('${order.id}')" class="bg-gray-800 hover:bg-black text-white px-3 py-1 rounded-lg text-xs font-bold shadow">🖨️ طباعة</button>
+              <button onclick="printFormalSlip('${order.id}')" class="bg-slate-800 hover:bg-black text-white px-2.5 py-1 rounded-lg text-xs font-bold font-en shadow">🖨️ Print</button>
             </td>
           </tr>
         `;
@@ -1014,51 +1053,51 @@
     function exportToExcel() {
       const data = [];
       state.orders.forEach(o => {
+        const d = new Date(o.createdAt);
         o.bls.forEach((b, idx) => {
           data.push({
-            'رقم الطلب': o.id,
-            'التاريخ': new Date(o.createdAt).toLocaleDateString('ar-EG'),
-            'الوقت': new Date(o.createdAt).toLocaleTimeString('ar-EG'),
-            'منشئ الطلب': o.createdBy,
-            'موظف التحجيم': o.measuredBy || '-',
-            'الحالة': o.status,
-            'نوع السيارة': o.vehicleType || '-',
-            'البند': `بوليصة (${idx + 1})`,
-            'رقم البوليصة': b.blNumber,
+            'Order ID': o.id,
+            'Date': formatDateEn(d),
+            'Time': formatTime12(d),
+            'Created By': o.createdBy,
+            'Tahjeem Staff': o.measuredBy || '-',
+            'Status': o.status,
+            'Vehicle': o.vehicleType || '-',
+            'Item': `B/L (${idx + 1})`,
+            'B/L No.': b.blNumber,
             'ALV Serial': b.alvSerial,
-            'العدد': b.qty,
-            'الوزن (طن)': b.weight,
-            'البلتات': b.pallets,
-            'الموقع': b.location,
-            'شركة التخليص': b.clearanceCompany,
-            'الطول (م)': o.measurements?.length || '-',
-            'العرض (م)': o.measurements?.width || '-',
-            'الارتفاع (م)': o.measurements?.height || '-',
-            'ملاحظات موظف التحجيم': o.shareefNotes || '-'
+            'QTY': b.qty,
+            'Weight (Tons)': b.weight,
+            'Pallets': b.pallets,
+            'Location': b.location,
+            'Clearance Co.': b.clearanceCompany,
+            'Length (m)': o.measurements?.length || '-',
+            'Width (m)': o.measurements?.width || '-',
+            'Height (m)': o.measurements?.height || '-',
+            'Warehouse Notes': o.shareefNotes || '-'
           });
         });
       });
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "أرشيف الطلبات");
-      XLSX.writeFile(wb, `ارشيف_الطلبات_${new Date().toISOString().slice(0,10)}.xlsx`);
+      XLSX.utils.book_append_sheet(wb, ws, "Archive");
+      XLSX.writeFile(wb, `Tahjeem_ALV_Archive_${new Date().toISOString().slice(0,10)}.xlsx`);
     }
 
     async function cleanOldOrders(days) {
-      const label = days === 7 ? 'أسبوع' : 'شهر';
-      if (!confirm(`هل أنت متأكد من حذف الطلبات الأقدم من ${label}؟`)) return;
+      if (!confirm(`Purge orders older than ${days} days?`)) return;
       await fetch(`/api/orders/clean?days=${days}`, { method: 'DELETE' });
       loadData();
-      alert(`تم الحذف بنجاح ✅`);
+      alert(`Cleaned successfully ✅`);
     }
 
     async function exportAndClearAll() {
-      if (!confirm('⚠️ تحذير: سيتم تحميل ملف الإكسل ثم تفريغ كامل الأرشيف من قاعدة البيانات.\nهل أنت متأكد؟')) return;
+      if (!confirm('⚠️ Export full excel and clear entire database permanently?')) return;
       exportToExcel();
       setTimeout(async () => {
         await fetch('/api/orders/clear-all', { method: 'DELETE' });
         loadData();
-        alert('تم تفريغ الأرشيف بالكامل بنجاح 🚀');
+        alert('Database cleared successfully 🚀');
       }, 1500);
     }
 
