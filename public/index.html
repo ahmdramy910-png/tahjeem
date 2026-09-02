@@ -308,54 +308,18 @@
       return bls;
     }
 
-    // ضغط الصورة فورياً في المتصفح قبل إرسالها لسرعة فائقة ووضوح كامل
-    async function compressImage(file) {
-      return new Promise((resolve) => {
-        const img = new Image();
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            let width = img.width;
-            let height = img.height;
-            const maxDimension = 1000;
-
-            if (width > height && width > maxDimension) {
-              height = Math.round((height * maxDimension) / width);
-              width = maxDimension;
-            } else if (height > maxDimension) {
-              width = Math.round((width * maxDimension) / height);
-              height = maxDimension;
-            }
-
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-
-            canvas.toBlob((blob) => {
-              resolve(blob);
-            }, 'image/jpeg', 0.75);
-          };
-          img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-      });
-    }
-
     async function handleOCR(e, index) {
       const file = e.target.files[0];
       if (!file) return;
 
       const btnLabel = document.getElementById(`btn-ocr-${index}`);
-      btnLabel.innerHTML = '<span>⏳ جاري القراءة السريعة...</span>';
+      btnLabel.innerHTML = '<span>⏳ جاري التحليل...</span>';
       btnLabel.classList.add('opacity-75');
 
-      try {
-        const compressedBlob = await compressImage(file);
-        const formData = new FormData();
-        formData.append('image', compressedBlob, 'screenshot.jpg');
+      const formData = new FormData();
+      formData.append('image', file);
 
+      try {
         const res = await fetch('/api/ocr', { method: 'POST', body: formData });
         const data = await res.json();
         
