@@ -184,7 +184,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// 6. تحليل السكرين شوت عبر موديلات الرؤية النشطة في Groq
+// 6. تحليل السكرين شوت عبر Groq Vision
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -222,15 +222,15 @@ FIELDS TO EXTRACT:
 Return valid JSON ONLY in this format:
 {"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
 
-    const activeVisionModels = [
-      'qwen/qwen3.6-27b',
-      'llama-3.2-90b-vision-preview'
+    const candidateModels = [
+      'meta-llama/llama-4-scout-17b-vision',
+      'meta-llama/llama-4-scout'
     ];
 
     let lastError = null;
     let data = null;
 
-    for (const model of activeVisionModels) {
+    for (const model of candidateModels) {
       try {
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
@@ -259,7 +259,7 @@ Return valid JSON ONLY in this format:
           lastError = null;
           break;
         } else {
-          lastError = data.error?.message || 'خطأ من مزود Groq';
+          lastError = data.error?.message || 'Groq error';
         }
       } catch (err) {
         lastError = err.message;
