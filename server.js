@@ -90,68 +90,75 @@ app.post('/api/employees', async (req, res) => {
   res.json({ employees: db.employees });
 });
 
-// 3. تحليل السكرين شوت فائق السرعة عبر Gemini Flash
+// 3. تحليل السكرين شوت بالذكاء الاصطناعي (OpenRouter Free Model القديم)
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'لم يتم استلام ملف صورة' });
     }
 
-    const geminiKey = process.env.GEMINI_API_KEY;
-    if (!geminiKey) {
-      return res.status(500).json({ error: 'مفتاح GEMINI_API_KEY غير معرف في Render' });
+    const openrouterKey = process.env.OPENROUTER_API_KEY;
+    if (!openrouterKey) {
+      return res.status(500).json({ error: 'مفتاح OPENROUTER_API_KEY غير معرف في Render' });
     }
 
     const base64Image = req.file.buffer.toString('base64');
-    const mimeType = req.file.mimetype || 'image/jpeg';
+    const mimeType = req.file.mimetype || 'image/png';
+    const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
-    const prompt = `Extract these fields from this Sage CRM LCL window screenshot into raw JSON only:
+    const prompt = `You are a strict data extractor for Sage CRM LCL window.
+Extract these exact fields from the image into JSON:
 {
   "blNumber": "B/L No.",
   "alvSerial": "ALV Serial",
   "qty": "QTY as integer",
-  "weight": "Weight(Ton) rounded UP to nearest 0.1 (e.g. 1.611 -> 1.7)",
-  "pallets": "ALV Pallet count",
-  "location": "Most frequent storage location from bottom table",
+  "weight": "Weight(Ton) rounded UP to the nearest 0.1 (e.g., 1.611 becomes 1.7)",
+  "pallets": "ALV Pallet as integer",
+  "location": "Most frequent location code from the bottom table",
   "clearanceCompany": "Company clearance name"
 }
-Return valid raw JSON only. Do not wrap in markdown backticks.`;
+Return valid raw JSON ONLY. No explanation, no markdown backticks.`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${geminiKey}`;
-
-    const response = await fetch(url, {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': `Bearer ${openrouterKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://tahjeem.onrender.com',
+        'X-Title': 'Tahjeem Logistics System'
+      },
       body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: mimeType, data: base64Image } }
-          ]
-        }],
-        generationConfig: {
-          response_mime_type: 'application/json',
-          temperature: 0.1,
-          maxOutputTokens: 300
-        }
+        model: 'openrouter/free',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: dataUrl } }
+            ]
+          }
+        ],
+        temperature: 0.1
       })
     });
 
     const data = await response.json();
 
-    if (data.error) {
-      console.error('Gemini API Error:', data.error);
-      return res.status(500).json({ error: data.error.message });
+    if (!response.ok) {
+      console.error('OpenRouter Error:', data);
+      return res.status(500).json({ error: data.error?.message || 'خطأ من مزود OpenRouter' });
     }
 
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-    const parsed = JSON.parse(rawText);
+    let rawContent = data.choices?.[0]?.message?.content || '{}';
+    const match = rawContent.match(/\{[\s\S]*\}/);
+    const jsonStr = match ? match[0] : '{}';
+    const parsed = JSON.parse(jsonStr);
 
     return res.json(parsed);
 
   } catch (err) {
     console.error('OCR Endpoint Error:', err);
-    return res.status(500).json({ error: 'تعذر قراءة الصورة: ' + err.message });
+    return res.status(500).json({ error: 'فشل معالجة الصورة: ' + err.message });
   }
 });
 
@@ -191,7 +198,7 @@ app.patch('/api/orders/:id/tahjeem', async (req, res) => {
   res.json(order);
 });
 
-// 6. تنظيف الطلبات القديمة
+// 6. حذف الطلبات القديمة لتفريغ المساحة
 app.delete('/api/orders/clean', async (req, res) => {
   const days = parseInt(req.query.days) || 7;
   const db = await loadDB();
