@@ -169,7 +169,7 @@
         <div class="flex justify-between items-center mb-6 flex-wrap gap-4 border-b pb-4">
           <div>
             <h2 class="text-xl font-extrabold text-blue-900">📁 الأرشيف الشامل وإدارة السجلات</h2>
-            <p class="text-xs text-gray-500 mt-1">البحث في السجلات، التصدير، وتنظيف المساحة عند الحاجة</p>
+            <p class="text-xs text-gray-500 mt-1">البحث في السجلات، التصدير، وتفريغ المساحة عند الحاجة</p>
           </div>
           <div class="flex flex-wrap items-center gap-2">
             <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs md:text-sm font-bold px-3 py-2 rounded-lg shadow transition">
@@ -308,18 +308,54 @@
       return bls;
     }
 
+    // ضغط الصورة فورياً في المتصفح قبل إرسالها لسرعة فائقة
+    async function compressImage(file) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            const maxDimension = 1200;
+
+            if (width > height && width > maxDimension) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else if (height > maxDimension) {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            canvas.toBlob((blob) => {
+              resolve(blob);
+            }, 'image/jpeg', 0.85);
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
     async function handleOCR(e, index) {
       const file = e.target.files[0];
       if (!file) return;
 
       const btnLabel = document.getElementById(`btn-ocr-${index}`);
-      btnLabel.innerHTML = '<span>⏳ جاري القراءة...</span>';
+      btnLabel.innerHTML = '<span>⏳ جاري القراءة السريعة...</span>';
       btnLabel.classList.add('opacity-75');
 
-      const formData = new FormData();
-      formData.append('image', file);
-
       try {
+        const compressedBlob = await compressImage(file);
+        const formData = new FormData();
+        formData.append('image', compressedBlob, 'screenshot.jpg');
+
         const res = await fetch('/api/ocr', { method: 'POST', body: formData });
         const data = await res.json();
         
