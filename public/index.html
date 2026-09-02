@@ -308,7 +308,7 @@
       return bls;
     }
 
-    // ضغط الصورة فورياً في المتصفح قبل إرسالها لسرعة فائقة
+    // ضغط الصورة فورياً في المتصفح قبل إرسالها لسرعة فائقة ووضوح كامل
     async function compressImage(file) {
       return new Promise((resolve) => {
         const img = new Image();
@@ -318,7 +318,7 @@
             const canvas = document.createElement('canvas');
             let width = img.width;
             let height = img.height;
-            const maxDimension = 1200;
+            const maxDimension = 1000;
 
             if (width > height && width > maxDimension) {
               height = Math.round((height * maxDimension) / width);
@@ -335,7 +335,7 @@
 
             canvas.toBlob((blob) => {
               resolve(blob);
-            }, 'image/jpeg', 0.85);
+            }, 'image/jpeg', 0.75);
           };
           img.src = e.target.result;
         };
