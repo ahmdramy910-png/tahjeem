@@ -90,7 +90,7 @@ app.post('/api/employees', async (req, res) => {
   res.json({ employees: db.employees });
 });
 
-// 3. تحليل السكرين شوت بالذكاء الاصطناعي (سريع ومجاني 100% عبر OpenRouter)
+// 3. تحليل السكرين شوت بالذكاء الاصطناعي (مصحح ومجاني 100%)
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -106,18 +106,17 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
     const mimeType = req.file.mimetype || 'image/jpeg';
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
-    const prompt = `You are a strict data extractor for Sage CRM LCL window.
-Extract these exact fields from the image into JSON:
-{
-  "blNumber": "B/L No.",
-  "alvSerial": "ALV Serial",
-  "qty": "QTY as integer",
-  "weight": "Weight(Ton) rounded UP to the nearest 0.1 (e.g., 1.611 becomes 1.7)",
-  "pallets": "ALV Pallet as integer",
-  "location": "Most frequent location code from the bottom table",
-  "clearanceCompany": "Company clearance name"
-}
-Return valid raw JSON ONLY. No explanation, no markdown backticks.`;
+    const prompt = `Extract these exact fields from the logistics Sage CRM screenshot:
+- B/L No. (blNumber)
+- ALV Serial (alvSerial)
+- QTY (qty)
+- Weight(Ton) (weight: round UP to nearest 0.1 step, e.g. 1.611 becomes 1.7)
+- ALV Pallet (pallets)
+- Warehouse location code from bottom table (location)
+- Clearance company name (clearanceCompany)
+
+Output JSON only in this format:
+{"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -125,12 +124,12 @@ Return valid raw JSON ONLY. No explanation, no markdown backticks.`;
         'Authorization': `Bearer ${openrouterKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://tahjeem.onrender.com',
-        'X-Title': 'Tahjeem Logistics System'
+        'X-Title': 'Tahjeem Logistics'
       },
       body: JSON.stringify({
-        model: 'google/gemma-4-26b-a4b-it:free',
+        model: 'minimax/minimax-m3:free',
         models: [
-          'google/gemma-4-26b-a4b-it:free',
+          'minimax/minimax-m3:free',
           'openrouter/free'
         ],
         messages: [
@@ -142,9 +141,7 @@ Return valid raw JSON ONLY. No explanation, no markdown backticks.`;
             ]
           }
         ],
-        response_format: { type: 'json_object' },
-        temperature: 0.1,
-        max_tokens: 300
+        temperature: 0.1
       })
     });
 
@@ -152,17 +149,20 @@ Return valid raw JSON ONLY. No explanation, no markdown backticks.`;
 
     if (!response.ok) {
       console.error('OpenRouter Error:', data);
-      return res.status(500).json({ error: data.error?.message || 'خطأ من مزود OpenRouter' });
+      return res.status(500).json({ error: data.error?.message || 'خطأ من مزود الذكاء الاصطناعي' });
     }
 
-    let rawContent = data.choices?.[0]?.message?.content || '{}';
-    rawContent = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(rawContent);
+    let raw = data.choices?.[0]?.message?.content || '{}';
+    // استخراج الـ JSON بدقة حتى لو كتب الموديل أي كلام قبله أو بعده
+    const match = raw.match(/\{[\s\S]*\}/);
+    const jsonStr = match ? match[0] : '{}';
+    const parsed = JSON.parse(jsonStr);
+
     return res.json(parsed);
 
   } catch (err) {
     console.error('OCR Endpoint Error:', err);
-    return res.status(500).json({ error: 'فشل معالجة الصورة: ' + err.message });
+    return res.status(500).json({ error: 'تعذر قراءة الصورة: ' + err.message });
   }
 });
 
@@ -202,7 +202,7 @@ app.patch('/api/orders/:id/tahjeem', async (req, res) => {
   res.json(order);
 });
 
-// 6. حذف الطلبات القديمة
+// 6. تنظيف الطلبات القديمة
 app.delete('/api/orders/clean', async (req, res) => {
   const days = parseInt(req.query.days) || 7;
   const db = await loadDB();
