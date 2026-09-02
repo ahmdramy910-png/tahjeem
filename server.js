@@ -184,7 +184,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// 6. تحليل السكرين شوت بالموديل البصري النشط والمعتمد رسمياً على Groq
+// 6. تحليل السكرين شوت عبر Groq Vision بمرونة تامة وبدون تعارض الـ JSON
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -200,26 +200,16 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
     const mimeType = req.file.mimetype || 'image/png';
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
-    const prompt = `You are a precision OCR engine for Sage CRM logistics windows.
-Transcribe text with 100% exact alphanumeric accuracy without omitting any characters.
+    const prompt = `Transcribe text from this Sage CRM logistics window accurately.
+Output ONLY valid JSON without any markdown ticks or conversation.
 
-STRICT CHARACTER & FORMAT RULES:
-1. '0' vs 'O': Serial numbers, ALV numbers, and B/L identifiers contain DIGIT '0', NOT letter 'O'.
-2. '6' vs 'G': Closed curved loops in serials are digit '6'.
-3. '1' vs 'I'/'l': Pure numeric segments use digit '1'.
-4. COMPLETE TEXT: Do not drop, skip, or shorten any characters from B/L No. or ALV Serial.
-5. QUANTITY (qty): MUST be a whole integer ONLY. Strip trailing decimals like "55.000" to "55".
+Rules:
+1. Serial numbers contain DIGIT '0', not 'O'.
+2. Curving closed loops in serials are digit '6'.
+3. Quantity (qty) must be integer only (e.g. 55).
+4. Weight (weight) must be rounded UP to 0.1 ton (e.g. 1.611 becomes 1.7).
 
-FIELDS TO EXTRACT:
-- blNumber: Full B/L No. exactly as shown.
-- alvSerial: Full ALV Serial exactly as shown.
-- qty: Whole integer quantity.
-- weight: Weight in tons rounded UP to the nearest 0.1 ton (e.g., 1.611 becomes 1.7).
-- pallets: ALV Pallet count as integer.
-- location: Primary storage location code from the bottom table.
-- clearanceCompany: Full clearance company name.
-
-Return valid JSON ONLY in this format:
+JSON keys:
 {"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -239,8 +229,7 @@ Return valid JSON ONLY in this format:
             ]
           }
         ],
-        temperature: 0.0,
-        response_format: { type: 'json_object' }
+        temperature: 0.0
       })
     });
 
@@ -252,7 +241,7 @@ Return valid JSON ONLY in this format:
     }
 
     let rawContent = data.choices?.[0]?.message?.content || '{}';
-    const match = rawContent.match(/\{[\s\S]*\}/);
+    const match = rawContent.match(/\{[\s\S]*?\}/);
     const jsonStr = match ? match[0] : '{}';
     const parsed = JSON.parse(jsonStr);
 
