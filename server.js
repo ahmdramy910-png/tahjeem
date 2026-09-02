@@ -184,7 +184,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// 6. تحليل السكرين شوت فائق السرعة عبر محرك Groq المجاني
+// 6. تحليل السكرين شوت فائق السرعة عبر موديل الرؤية النشط على Groq
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -219,7 +219,7 @@ FIELDS TO EXTRACT:
 - location: Primary storage location code from the bottom table.
 - clearanceCompany: Full clearance company name.
 
-Return valid JSON ONLY in this format, without markdown:
+Return valid JSON ONLY in this format:
 {"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -229,7 +229,7 @@ Return valid JSON ONLY in this format, without markdown:
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'llama-3.2-11b-vision-preview',
+        model: 'qwen/qwen3.6-27b',
         messages: [
           {
             role: 'user',
