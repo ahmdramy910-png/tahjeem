@@ -15,25 +15,16 @@ app.use(express.static('public'));
 // --- الاتصال بقاعدة البيانات السحابية MongoDB Atlas ---
 const MONGODB_URI = process.env.MONGODB_URI;
 
-// قائمة الموظفين الافتراضية
-const defaultUsers = [
-  { id: 'u1', name: 'أحمد رامي', role: 'cs', password: '' },
-  { id: 'u2', name: 'كستمر سيرفس 1', role: 'cs', password: '' },
-  { id: 'u3', name: 'كستمر سيرفس 2', role: 'cs', password: '' },
-  { id: 'u4', name: 'موظف التحجيم 1', role: 'warehouse', password: '' },
-  { id: 'u5', name: 'موظف التحجيم 2', role: 'warehouse', password: '' }
-];
-
 const AppStateSchema = new mongoose.Schema({
   key: { type: String, default: 'main_state', unique: true },
-  users: { type: Array, default: defaultUsers },
+  users: { type: Array, default: [] },
   orders: { type: Array, default: [] }
 }, { timestamps: true });
 
 const AppState = mongoose.model('AppState', AppStateSchema);
 
 let memoryState = {
-  users: defaultUsers,
+  users: [],
   orders: []
 };
 
@@ -47,11 +38,6 @@ if (MONGODB_URI) {
       const doc = await AppState.findOne({ key: 'main_state' });
       if (!doc) {
         await AppState.create({ key: 'main_state', ...memoryState });
-      } else {
-        if (!doc.users || doc.users.length === 0) {
-          doc.users = defaultUsers;
-          await doc.save();
-        }
       }
     })
     .catch(err => {
@@ -63,7 +49,7 @@ async function loadDB() {
   if (isConnectedToMongo) {
     try {
       const doc = await AppState.findOne({ key: 'main_state' });
-      if (doc) return { users: doc.users || defaultUsers, orders: doc.orders || [] };
+      if (doc) return { users: doc.users || [], orders: doc.orders || [] };
     } catch (err) {
       console.error('Error loading from DB:', err);
     }
@@ -86,42 +72,27 @@ async function saveDB(data) {
   }
 }
 
-// 1. جلب قائمة الموظفين لقائمة الاختيار
+// 1. جلب قائمة الموظفين المسجلين
 app.get('/api/users/list', async (req, res) => {
   const db = await loadDB();
-  const list = db.users.map(u => ({
+  const list = (db.users || []).map(u => ({
     id: u.id,
     name: u.name,
-    role: u.role,
-    hasPassword: !!u.password
+    role: u.role
   }));
   res.json(list);
 });
 
-// 2. تسجيل الدخول أو تعيين كلمة المرور (8 خانات)
+// 2. تسجيل الدخول
 app.post('/api/login', async (req, res) => {
   const { userId, password } = req.body;
   if (!userId || !password) {
     return res.status(400).json({ error: 'يرجى اختيار الموظف وإدخال كلمة المرور' });
   }
 
-  if (password.length < 8) {
-    return res.status(400).json({ error: 'كلمة المرور يجب أن تتكون من 8 خانات على الأقل' });
-  }
-
   const db = await loadDB();
   const user = db.users.find(u => u.id === userId);
-  if (!user) return res.status(404).json({ error: 'الموظف غير مسجل' });
-
-  if (!user.password) {
-    user.password = password;
-    await saveDB(db);
-    return res.json({
-      success: true,
-      message: 'تم تعيين كلمة المرور بنجاح!',
-      user: { id: user.id, name: user.name, role: user.role }
-    });
-  }
+  if (!user) return res.status(404).json({ error: 'الموظف غير موجود' });
 
   if (user.password !== password) {
     return res.status(401).json({ error: 'كلمة المرور غير صحيحة' });
@@ -133,21 +104,39 @@ app.post('/api/login', async (req, res) => {
   });
 });
 
-// 3. إضافة موظف جديد
-app.post('/api/users/add', async (req, res) => {
-  const { name, role } = req.body;
-  if (!name) return res.status(400).json({ error: 'اسم الموظف مطلوب' });
+// 3. إنشاء حساب موظف جديد
+app.post('/api/users/register', async (req, res) => {
+  const { name, role, password } = req.body;
+  if (!name || !password) {
+    return res.status(400).json({ error: 'اسم الموظف وكلمة المرور مطلوبان' });
+  }
+
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'كلمة المرور يجب أن تتكون من 8 خانات على الأقل' });
+  }
 
   const db = await loadDB();
-  const newId = 'u' + (db.users.length + 1) + '_' + Date.now().toString().slice(-4);
-  db.users.push({
+  const cleanName = name.trim();
+  
+  if (db.users.some(u => u.name.toLowerCase() === cleanName.toLowerCase())) {
+    return res.status(400).json({ error: 'هذا الاسم مسجل مسبقاً' });
+  }
+
+  const newId = 'u_' + Date.now();
+  const newUser = {
     id: newId,
-    name: name.trim(),
+    name: cleanName,
     role: role || 'cs',
-    password: ''
-  });
+    password: password.trim()
+  };
+
+  db.users.push(newUser);
   await saveDB(db);
-  res.json({ success: true, id: newId, name });
+
+  res.json({
+    success: true,
+    user: { id: newUser.id, name: newUser.name, role: newUser.role }
+  });
 });
 
 // 4. جلب الطلبات
@@ -156,12 +145,12 @@ app.get('/api/data', async (req, res) => {
   res.json({ orders: db.orders });
 });
 
-// 5. إحصائيات إنتاجية الموظفين (بوالص + سيارات فقط، الطلب الواحد = سيارة واحدة)
+// 5. إحصائيات إنتاجية الموظفين (بوالص + سيارات)
 app.get('/api/stats', async (req, res) => {
   const db = await loadDB();
   const stats = {};
 
-  db.users.forEach(u => {
+  (db.users || []).forEach(u => {
     stats[u.name] = {
       role: u.role === 'cs' ? 'خدمة عملاء' : 'مستودع وتحجيم',
       totalBLs: 0,
@@ -169,21 +158,19 @@ app.get('/api/stats', async (req, res) => {
     };
   });
 
-  db.orders.forEach(order => {
+  (db.orders || []).forEach(order => {
     const blCount = (order.bls || []).length;
     if (blCount === 0) return;
 
-    // الموظف الذي أنشأ الطلب أو قام بالطباعة اليدوية
     const creator = order.createdBy;
     if (creator) {
       if (!stats[creator]) {
         stats[creator] = { role: 'موظف', totalBLs: 0, totalCars: 0 };
       }
       stats[creator].totalBLs += blCount;
-      stats[creator].totalCars += 1; // كل طلب يمثل سيارة واحدة مباشرة
+      stats[creator].totalCars += 1;
     }
 
-    // إذا كان الطلب تم تحجيمه بواسطة موظف مستودع آخر
     const measurer = order.measuredBy;
     if (measurer && measurer !== creator && order.status === 'تم التحجيم') {
       if (!stats[measurer]) {
@@ -287,14 +274,14 @@ Return valid JSON ONLY in this format:
   }
 });
 
-// 7. إنشاء طلب جديد (الطلب = سيارة)
+// 7. إنشاء طلب جديد
 app.post('/api/orders', async (req, res) => {
   const db = await loadDB();
   const newOrder = {
     id: 'ORD-' + Math.floor(100000 + Math.random() * 900000),
     createdAt: new Date().toISOString(),
     createdBy: req.body.createdBy || 'خدمة العملاء',
-    status: req.body.isManual ? 'طباعة يدوية (احتياطية)' : 'بانتظار التحجيم',
+    status: req.body.isManual ? 'طباعة يدوية' : 'بانتظار التحجيم',
     isManualPrint: !!req.body.isManual,
     bls: req.body.bls || [],
     totalWeight: req.body.totalWeight || 0,
