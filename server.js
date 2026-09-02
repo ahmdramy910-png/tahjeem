@@ -90,7 +90,7 @@ app.post('/api/employees', async (req, res) => {
   res.json({ employees: db.employees });
 });
 
-// 3. تحليل السكرين شوت فائق السرعة عبر Gemini Flash (1 إلى 2 ثانية)
+// 3. تحليل السكرين شوت فائق السرعة عبر Gemini Flash
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -131,7 +131,8 @@ Return valid raw JSON only. Do not wrap in markdown backticks.`;
         }],
         generationConfig: {
           response_mime_type: 'application/json',
-          temperature: 0.1
+          temperature: 0.1,
+          maxOutputTokens: 300
         }
       })
     });
