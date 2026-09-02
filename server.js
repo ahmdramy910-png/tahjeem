@@ -37,7 +37,7 @@ if (MONGODB_URI) {
       console.log('✅ Connected permanently to MongoDB Atlas');
       const doc = await AppState.findOne({ key: 'main_state' });
       if (!doc) {
-        await AppState.create({ key: 'main_state', ...memoryState });
+        await AppState.create({ key: 'main_state', users: [], orders: [] });
       }
     })
     .catch(err => {
@@ -72,7 +72,7 @@ async function saveDB(data) {
   }
 }
 
-// 1. جلب قائمة الموظفين المسجلين
+// 1. جلب قائمة الموظفين
 app.get('/api/users/list', async (req, res) => {
   const db = await loadDB();
   const list = (db.users || []).map(u => ({
@@ -184,16 +184,16 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// 6. تحليل السكرين شوت بدقة فائقة
+// 6. تحليل السكرين شوت فائق السرعة عبر محرك Groq المجاني
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'لم يتم استلام ملف صورة' });
     }
 
-    const openrouterKey = process.env.OPENROUTER_API_KEY;
-    if (!openrouterKey) {
-      return res.status(500).json({ error: 'مفتاح OPENROUTER_API_KEY غير معرف في Render' });
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!groqKey) {
+      return res.status(500).json({ error: 'مفتاح GROQ_API_KEY غير معرف في Render' });
     }
 
     const base64Image = req.file.buffer.toString('base64');
@@ -204,7 +204,7 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
 Transcribe text with 100% exact alphanumeric accuracy without omitting any characters.
 
 STRICT CHARACTER & FORMAT RULES:
-1. '0' vs 'O': Serial numbers, ALV numbers, and B/L identifiers contain the DIGIT '0', NOT the letter 'O'.
+1. '0' vs 'O': Serial numbers, ALV numbers, and B/L identifiers contain DIGIT '0', NOT letter 'O'.
 2. '6' vs 'G': Closed curved loops in serials are digit '6'.
 3. '1' vs 'I'/'l': Pure numeric segments use digit '1'.
 4. COMPLETE TEXT: Do not drop, skip, or shorten any characters from B/L No. or ALV Serial.
@@ -219,19 +219,17 @@ FIELDS TO EXTRACT:
 - location: Primary storage location code from the bottom table.
 - clearanceCompany: Full clearance company name.
 
-Return valid JSON ONLY in this format:
+Return valid JSON ONLY in this format, without markdown:
 {"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openrouterKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://tahjeem.onrender.com',
-        'X-Title': 'Tahjeem Logistics System'
+        'Authorization': `Bearer ${groqKey}`,
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'openrouter/free',
+        model: 'llama-3.2-11b-vision-preview',
         messages: [
           {
             role: 'user',
@@ -241,15 +239,16 @@ Return valid JSON ONLY in this format:
             ]
           }
         ],
-        temperature: 0.0
+        temperature: 0.0,
+        response_format: { type: 'json_object' }
       })
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('OpenRouter Error:', data);
-      return res.status(500).json({ error: data.error?.message || 'خطأ من مزود OpenRouter' });
+      console.error('Groq Error:', data);
+      return res.status(500).json({ error: data.error?.message || 'خطأ من مزود Groq' });
     }
 
     let rawContent = data.choices?.[0]?.message?.content || '{}';
