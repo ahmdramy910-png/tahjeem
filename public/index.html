@@ -11,29 +11,79 @@
     body { font-family: 'Cairo', sans-serif; }
     .badge-tahjeem { background-color: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
     .badge-done { background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .badge-manual { background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
   </style>
 </head>
 <body class="bg-gray-100 text-gray-800 min-h-screen">
 
-  <nav class="bg-blue-900 text-white shadow-lg sticky top-0 z-50">
+  <!-- نافذة تسجيل الدخول (اختيار الموظف + باسوورد 8 خانات) -->
+  <div id="loginModal" class="fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full border border-gray-100 space-y-6 text-center">
+      <div class="w-16 h-16 bg-blue-100 text-blue-900 rounded-full flex items-center justify-center mx-auto text-3xl shadow-inner">
+        📦
+      </div>
+      <div>
+        <h2 class="text-2xl font-black text-gray-800">نظام تحجيم الشحنات (LCL)</h2>
+        <p class="text-xs text-gray-500 mt-1">قرية العقبة اللوجستية (ALV)</p>
+      </div>
+
+      <div class="space-y-4 text-right">
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">اختر الموظف:</label>
+          <select id="loginUserSelect" onchange="onUserSelectChange()" class="w-full border-2 border-gray-200 rounded-lg p-3 text-sm font-bold focus:border-blue-600 focus:outline-none bg-gray-50">
+            <option value="">-- اضغط لاختيار اسمك --</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">كلمة المرور (8 خانات):</label>
+          <input type="password" id="loginPassword" placeholder="اكتب 8 خانات على الأقل" class="w-full border-2 border-gray-200 rounded-lg p-3 text-sm focus:border-blue-600 focus:outline-none">
+          <p id="firstTimeHint" class="text-[11px] text-amber-600 mt-1 hidden font-semibold">
+            ✨ أول مرة تسجل؟ أدخل كلمة مرور جديدة من 8 خانات وسيتم حفظها لحسابك دائماً.
+          </p>
+        </div>
+      </div>
+
+      <div id="loginError" class="text-red-600 text-xs font-bold hidden"></div>
+
+      <button onclick="performLogin()" class="w-full bg-blue-900 hover:bg-blue-800 text-white font-bold py-3 rounded-lg shadow transition transform active:scale-95">
+        دخول للنظام 🔒
+      </button>
+
+      <div class="pt-2 text-xs text-gray-400 border-t">
+        نظام التحجيم الرقمي الداخلي © 2026
+      </div>
+    </div>
+  </div>
+
+  <!-- الشريط العلوي -->
+  <nav class="bg-blue-900 text-white shadow-lg sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
       <div class="flex items-center space-x-3 space-x-reverse">
         <span class="text-2xl">📦</span>
-        <h1 class="text-xl font-bold">نظام طلبات التحجيم (LCL)</h1>
+        <div>
+          <h1 class="text-lg font-extrabold leading-none">نظام طلبات التحجيم (LCL)</h1>
+          <span class="text-[11px] text-blue-200">Aqaba Logistics Village</span>
+        </div>
       </div>
       <div class="flex items-center space-x-4 space-x-reverse text-sm">
-        <label class="font-semibold text-blue-200">الموظف الحالي:</label>
-        <select id="employeeSelect" class="bg-blue-800 border border-blue-700 text-white rounded px-3 py-1 font-bold">
-        </select>
-        <button onclick="addNewEmployee()" class="bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded text-xs transition">+ موظف جديد</button>
+        <div class="bg-blue-800 px-3 py-1.5 rounded-lg flex items-center gap-2 border border-blue-700">
+          <span class="w-2.5 h-2.5 rounded-full bg-green-400"></span>
+          <span id="navUserName" class="font-bold text-white">-</span>
+          <span id="navUserRole" class="text-xs text-blue-200 bg-blue-950 px-2 py-0.5 rounded">-</span>
+        </div>
+        <button onclick="showAddUserPrompt()" class="bg-blue-700 hover:bg-blue-600 text-white px-2.5 py-1.5 rounded text-xs transition">+ موظف جديد</button>
+        <button onclick="logout()" class="bg-rose-700 hover:bg-rose-800 text-white px-3 py-1.5 rounded text-xs font-bold transition">خروج</button>
       </div>
     </div>
   </nav>
 
   <div class="max-w-7xl mx-auto px-4 py-6">
+    <!-- التبويبات -->
     <div class="flex border-b border-gray-300 mb-6 bg-white rounded-t-lg px-4 pt-2 shadow-sm flex-wrap gap-2">
       <button onclick="switchTab('cs')" id="tab-cs" class="py-3 px-6 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition">قسم خدمة العملاء (Customer Service)</button>
       <button onclick="switchTab('warehouse')" id="tab-wh" class="py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition">شاشة المستودع (موظف التحجيم)</button>
+      <button onclick="switchTab('stats')" id="tab-stats" class="py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition">📊 إنتاجية الموظفين (بوالص وسيارات)</button>
       <button onclick="switchTab('archive')" id="tab-arc" class="py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition">📁 الأرشيف الشامل للطلبات (Archive)</button>
     </div>
 
@@ -46,7 +96,7 @@
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="bls-container">
           <!-- بوليصة 1 -->
-          <div class="border border-blue-100 p-4 rounded-lg bg-blue-50/40 relative" id="bl-box-0">
+          <div class="border border-blue-100 p-4 rounded-lg bg-blue-50/40 relative">
             <div class="flex justify-between items-center mb-3">
               <span class="font-bold text-blue-800">بوليصة #1</span>
               <label class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 rounded cursor-pointer transition shadow-sm font-semibold inline-flex items-center gap-1" id="btn-ocr-0">
@@ -68,7 +118,7 @@
           </div>
 
           <!-- بوليصة 2 -->
-          <div class="border border-blue-100 p-4 rounded-lg bg-blue-50/40 relative" id="bl-box-1">
+          <div class="border border-blue-100 p-4 rounded-lg bg-blue-50/40 relative">
             <div class="flex justify-between items-center mb-3">
               <span class="font-bold text-blue-800">بوليصة #2</span>
               <label class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 rounded cursor-pointer transition shadow-sm font-semibold inline-flex items-center gap-1" id="btn-ocr-1">
@@ -90,7 +140,7 @@
           </div>
 
           <!-- بوليصة 3 -->
-          <div class="border border-blue-100 p-4 rounded-lg bg-blue-50/40 relative" id="bl-box-2">
+          <div class="border border-blue-100 p-4 rounded-lg bg-blue-50/40 relative">
             <div class="flex justify-between items-center mb-3">
               <span class="font-bold text-blue-800">بوليصة #3</span>
               <label class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 rounded cursor-pointer transition shadow-sm font-semibold inline-flex items-center gap-1" id="btn-ocr-2">
@@ -117,8 +167,8 @@
             الوزن الإجمالي للطلب: <span id="totalWeightDisplay" class="text-blue-600 font-extrabold text-xl">0.00</span> طن
           </div>
           <div class="flex gap-3">
-            <button onclick="printFormalSlip(null)" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-5 rounded-lg shadow-md transition flex items-center gap-2">
-              <span>🖨️ طباعة إشعار يدوي (احتياطي)</span>
+            <button onclick="handleManualPrintAndSave()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-5 rounded-lg shadow-md transition flex items-center gap-2">
+              <span>🖨️ طباعة إشعار يدوي + حفظ بالداتا</span>
             </button>
             <button onclick="submitOrder()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-6 rounded-lg shadow-md transition transform active:scale-95 flex items-center gap-2">
               <span>🚀 إرسال لموظف التحجيم</span>
@@ -127,7 +177,7 @@
         </div>
       </div>
 
-      <!-- السجل اليومي -->
+      <!-- السجل اليومي للطلبات الحالية -->
       <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
         <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
           <h2 class="text-lg font-bold text-gray-800">سجل الطلبات الحالية</h2>
@@ -140,11 +190,12 @@
             <thead class="bg-gray-100 text-gray-600 uppercase text-xs">
               <tr>
                 <th class="p-3">رقم الطلب</th>
+                <th class="p-3">بواسطة</th>
                 <th class="p-3">البوالص والمواقع</th>
-                <th class="p-3">الوزن الإجمالي</th>
+                <th class="p-3">الوزن</th>
                 <th class="p-3">الحالة</th>
-                <th class="p-3">نوع السيارة المختار</th>
-                <th class="p-3">الطباعة والملفات</th>
+                <th class="p-3">السيارة</th>
+                <th class="p-3">إجراءات</th>
               </tr>
             </thead>
             <tbody id="ordersTableBody" class="divide-y divide-gray-200">
@@ -163,7 +214,25 @@
       </div>
     </div>
 
-    <!-- 3. قسم الأرشيف الشامل وإدارة التخزين -->
+    <!-- 3. قسم إحصائيات وإنتاجية الموظفين (بوالص + سيارات فقط) -->
+    <div id="section-stats" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+        <div class="flex justify-between items-center mb-6 border-b pb-4 flex-wrap gap-4">
+          <div>
+            <h2 class="text-xl font-extrabold text-blue-900">📊 تقرير إنجاز الموظفين (بوالص وسيارات)</h2>
+            <p class="text-xs text-gray-500 mt-1">كل طلب أو طباعة يُحسب كـ "سيارة واحدة"، مع إجمالي عدد البوالص المنجزة</p>
+          </div>
+          <button onclick="exportStatsToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs md:text-sm font-bold px-4 py-2 rounded-lg shadow transition">
+            📊 تصدير إحصائية الإنتاجية (Excel)
+          </button>
+        </div>
+
+        <div id="statsCardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. قسم الأرشيف الشامل -->
     <div id="section-archive" class="hidden space-y-6">
       <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
         <div class="flex justify-between items-center mb-6 flex-wrap gap-4 border-b pb-4">
@@ -187,20 +256,18 @@
           </div>
         </div>
 
-        <!-- حقل البحث المباشر -->
         <div class="mb-4">
           <input type="text" id="archiveSearchInput" oninput="filterArchive()" placeholder="🔍 ابحث برقم البوليصة، ALV، رقم الطلب، شركة التخليص، أو اسم الموظف..." class="w-full border-2 border-blue-200 rounded-lg p-3 text-sm focus:outline-none focus:border-blue-600 shadow-sm">
         </div>
 
-        <!-- جدول الأرشيف الشامل -->
         <div class="overflow-x-auto rounded-lg border border-gray-200">
           <table class="w-full text-right text-xs md:text-sm">
             <thead class="bg-blue-900 text-white uppercase text-xs">
               <tr>
                 <th class="p-3">رقم الطلب والتاريخ</th>
-                <th class="p-3">منشئ الطلب</th>
+                <th class="p-3">الموظف</th>
                 <th class="p-3">البوالص وتفاصيلها</th>
-                <th class="p-3">الوزن الإجمالي</th>
+                <th class="p-3">الوزن</th>
                 <th class="p-3">الأبعاد (L×W×H)</th>
                 <th class="p-3">السيارة</th>
                 <th class="p-3">الحالة والملاحظات</th>
@@ -217,19 +284,119 @@
   </div>
 
   <script>
-    let state = { employees: [], orders: [] };
+    let state = { orders: [] };
+    let usersList = [];
+    let currentUser = null;
+
+    async function loadUsersList() {
+      try {
+        const res = await fetch('/api/users/list');
+        usersList = await res.json();
+        const select = document.getElementById('loginUserSelect');
+        select.innerHTML = '<option value="">-- اضغط لاختيار اسمك --</option>' + 
+          usersList.map(u => `<option value="${u.id}">${u.name} (${u.role === 'cs' ? 'خدمة عملاء' : 'مستودع'})</option>`).join('');
+      } catch (e) {
+        console.error('Error loading users:', e);
+      }
+    }
+
+    function onUserSelectChange() {
+      const select = document.getElementById('loginUserSelect');
+      const selectedId = select.value;
+      const user = usersList.find(u => u.id === selectedId);
+      const hint = document.getElementById('firstTimeHint');
+      const pwdInput = document.getElementById('loginPassword');
+
+      pwdInput.value = '';
+      if (user && !user.hasPassword) {
+        hint.classList.remove('hidden');
+      } else {
+        hint.classList.add('hidden');
+      }
+    }
+
+    function checkAuth() {
+      const saved = localStorage.getItem('tahjeem_user');
+      if (saved) {
+        currentUser = JSON.parse(saved);
+        document.getElementById('loginModal').classList.add('hidden');
+        document.getElementById('navUserName').innerText = currentUser.name;
+        document.getElementById('navUserRole').innerText = currentUser.role === 'cs' ? 'خدمة عملاء' : 'مستودع';
+      } else {
+        document.getElementById('loginModal').classList.remove('hidden');
+        loadUsersList();
+      }
+    }
+
+    async function performLogin() {
+      const userId = document.getElementById('loginUserSelect').value;
+      const password = document.getElementById('loginPassword').value.trim();
+      const errBox = document.getElementById('loginError');
+      errBox.classList.add('hidden');
+
+      if (!userId) {
+        errBox.innerText = 'يرجى اختيار اسم الموظف أولاً';
+        errBox.classList.remove('hidden');
+        return;
+      }
+
+      if (password.length < 8) {
+        errBox.innerText = 'كلمة المرور يجب أن تتكون من 8 خانات على الأقل';
+        errBox.classList.remove('hidden');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'فشل الدخول');
+
+        currentUser = data.user;
+        localStorage.setItem('tahjeem_user', JSON.stringify(currentUser));
+        document.getElementById('loginModal').classList.add('hidden');
+        document.getElementById('navUserName').innerText = currentUser.name;
+        document.getElementById('navUserRole').innerText = currentUser.role === 'cs' ? 'خدمة عملاء' : 'مستودع';
+        loadData();
+      } catch (err) {
+        errBox.innerText = err.message;
+        errBox.classList.remove('hidden');
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('tahjeem_user');
+      currentUser = null;
+      window.location.reload();
+    }
+
+    async function showAddUserPrompt() {
+      const name = prompt('اسم الموظف الجديد:');
+      if (!name) return;
+      const roleChoice = prompt('الدور: اكتب (cs) لخدمة العملاء، أو (warehouse) للمستودع:', 'cs');
+      const role = roleChoice === 'warehouse' ? 'warehouse' : 'cs';
+
+      const res = await fetch('/api/users/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, role })
+      });
+      const data = await res.json();
+      if (!res.ok) alert(data.error || 'خطأ في إضافة الموظف');
+      else alert(`تمت إضافة الموظف (${name}) بنجاح.`);
+    }
 
     async function loadData() {
       try {
         const res = await fetch('/api/data');
         const newData = await res.json();
-        
-        const dataChanged = JSON.stringify(state) !== JSON.stringify(newData);
-        state = newData;
+        const dataChanged = JSON.stringify(state.orders) !== JSON.stringify(newData.orders);
+        state.orders = newData.orders || [];
 
-        renderEmployees();
         renderOrders();
-        
         if (dataChanged && !document.activeElement?.matches('input, select, textarea')) {
           renderWarehouse();
           renderArchive();
@@ -239,31 +406,15 @@
       }
     }
 
-    function renderEmployees() {
-      const select = document.getElementById('employeeSelect');
-      if (select.children.length !== state.employees.length) {
-        select.innerHTML = state.employees.map(e => `<option value="${e}">${e}</option>`).join('');
-      }
-    }
-
-    async function addNewEmployee() {
-      const name = prompt('أدخل اسم الموظف الجديد:');
-      if (!name) return;
-      await fetch('/api/employees', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name })
-      });
-      loadData();
-    }
-
     function switchTab(tab) {
       document.getElementById('section-cs').classList.add('hidden');
       document.getElementById('section-warehouse').classList.add('hidden');
+      document.getElementById('section-stats').classList.add('hidden');
       document.getElementById('section-archive').classList.add('hidden');
 
       document.getElementById('tab-cs').className = "py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition";
       document.getElementById('tab-wh').className = "py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition";
+      document.getElementById('tab-stats').className = "py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition";
       document.getElementById('tab-arc').className = "py-3 px-6 font-bold text-gray-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition";
 
       if (tab === 'cs') {
@@ -273,6 +424,10 @@
         document.getElementById('section-warehouse').classList.remove('hidden');
         document.getElementById('tab-wh').className = "py-3 px-6 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition";
         renderWarehouse();
+      } else if (tab === 'stats') {
+        document.getElementById('section-stats').classList.remove('hidden');
+        document.getElementById('tab-stats').className = "py-3 px-6 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition";
+        loadStats();
       } else if (tab === 'archive') {
         document.getElementById('section-archive').classList.remove('hidden');
         document.getElementById('tab-arc').className = "py-3 px-6 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition";
@@ -322,7 +477,6 @@
       try {
         const res = await fetch('/api/ocr', { method: 'POST', body: formData });
         const data = await res.json();
-        
         if (data.error) throw new Error(data.error);
 
         document.getElementById(`bl-${index}-no`).value = data.blNumber || '';
@@ -340,6 +494,71 @@
         btnLabel.innerHTML = '<span>📷 سكرين شوت</span><input type="file" accept="image/*" class="hidden" onchange="handleOCR(event, ' + index + ')">';
         btnLabel.classList.remove('opacity-75');
       }
+    }
+
+    // طباعة إشعار يدوي + حفظ بالداتا فوراً
+    async function handleManualPrintAndSave() {
+      const bls = getFilledBLs();
+      if (bls.length === 0) {
+        alert('يرجى إدخال بيانات بوليصة واحدة على الأقل للطباعة والحفظ');
+        return;
+      }
+      const totalWeight = parseFloat(document.getElementById('totalWeightDisplay').innerText) || 0;
+
+      printFormalSlip(null);
+
+      await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bls,
+          totalWeight,
+          createdBy: currentUser ? currentUser.name : 'خدمة العملاء',
+          isManual: true,
+          shareefNotes: 'تمت الطباعة يدوياً وحفظ السجل'
+        })
+      });
+
+      clearInputs();
+      loadData();
+    }
+
+    async function submitOrder() {
+      const bls = getFilledBLs();
+      if (bls.length === 0) {
+        alert('يرجى إدخال بيانات بوليصة واحدة على الأقل');
+        return;
+      }
+
+      const totalWeight = parseFloat(document.getElementById('totalWeightDisplay').innerText) || 0;
+
+      await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bls,
+          totalWeight,
+          createdBy: currentUser ? currentUser.name : 'خدمة العملاء',
+          isManual: false
+        })
+      });
+
+      clearInputs();
+      loadData();
+      alert('تم إرسال الطلب لموظف التحجيم بنجاح 🚀');
+    }
+
+    function clearInputs() {
+      for (let i = 0; i < 3; i++) {
+        document.getElementById(`bl-${i}-no`).value = '';
+        document.getElementById(`bl-${i}-alv`).value = '';
+        document.getElementById(`bl-${i}-qty`).value = '';
+        document.getElementById(`bl-${i}-weight`).value = '';
+        document.getElementById(`bl-${i}-pallets`).value = '';
+        document.getElementById(`bl-${i}-loc`).value = '';
+        document.getElementById(`bl-${i}-company`).value = '';
+      }
+      calcTotalWeight();
     }
 
     function printFormalSlip(orderId) {
@@ -365,10 +584,6 @@
         notes = order.shareefNotes || '';
       } else {
         bls = getFilledBLs();
-        if (bls.length === 0) {
-          alert('يرجى إدخال أو قراءة بوليصة واحدة على الأقل للطباعة');
-          return;
-        }
         clearanceCompany = bls.find(b => b.clearanceCompany)?.clearanceCompany || '';
         dateStr = new Date().toLocaleDateString('ar-EG');
         totalWeight = document.getElementById('totalWeightDisplay').innerText;
@@ -482,50 +697,24 @@
       printWindow.document.close();
     }
 
-    async function submitOrder() {
-      const bls = getFilledBLs();
-      if (bls.length === 0) {
-        alert('يرجى إدخال بيانات بوليصة واحدة على الأقل');
-        return;
-      }
-
-      const totalWeight = parseFloat(document.getElementById('totalWeightDisplay').innerText) || 0;
-      const createdBy = document.getElementById('employeeSelect').value;
-
-      await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bls, totalWeight, createdBy })
-      });
-
-      for (let i = 0; i < 3; i++) {
-        document.getElementById(`bl-${i}-no`).value = '';
-        document.getElementById(`bl-${i}-alv`).value = '';
-        document.getElementById(`bl-${i}-qty`).value = '';
-        document.getElementById(`bl-${i}-weight`).value = '';
-        document.getElementById(`bl-${i}-pallets`).value = '';
-        document.getElementById(`bl-${i}-loc`).value = '';
-        document.getElementById(`bl-${i}-company`).value = '';
-      }
-      calcTotalWeight();
-      loadData();
-      alert('تم إرسال الطلب لموظف التحجيم بنجاح 🚀');
-    }
-
     function renderOrders() {
       const tbody = document.getElementById('ordersTableBody');
       tbody.innerHTML = state.orders.map(order => {
         const blDetails = order.bls.map(b => `<div class="font-semibold text-blue-900">${b.blNumber} <span class="text-xs text-gray-500">(${b.location || 'بلا موقع'})</span></div>`).join('');
         const isDone = order.status === 'تم التحجيم';
+        const isManual = order.status === 'طباعة يدوية (احتياطية)';
+        const badgeClass = isDone ? 'badge-done' : (isManual ? 'badge-manual' : 'badge-tahjeem');
+
         return `
           <tr class="hover:bg-gray-50">
             <td class="p-3 font-mono font-bold">${order.id}<br><span class="text-xs text-gray-400 font-normal">${new Date(order.createdAt).toLocaleTimeString('ar-EG')}</span></td>
+            <td class="p-3 font-semibold text-gray-700">${order.createdBy || '-'}</td>
             <td class="p-3">${blDetails}</td>
             <td class="p-3 font-bold text-gray-800">${order.totalWeight} طن</td>
-            <td class="p-3"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${isDone ? 'badge-done' : 'badge-tahjeem'}">${order.status}</span></td>
+            <td class="p-3"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeClass}">${order.status}</span></td>
             <td class="p-3 font-bold text-indigo-700">${order.vehicleType || '-'}</td>
             <td class="p-3">
-              ${isDone ? `<button onclick="printFormalSlip('${order.id}')" class="bg-gray-800 hover:bg-black text-white px-3 py-1 rounded text-xs font-bold shadow">🖨️ طباعة الإشعار المكتمل</button>` : '<span class="text-gray-400 text-xs">بانتظار التحجيم</span>'}
+              <button onclick="printFormalSlip('${order.id}')" class="bg-gray-800 hover:bg-black text-white px-3 py-1 rounded text-xs font-bold shadow">🖨️ إعادة الطباعة</button>
             </td>
           </tr>
         `;
@@ -556,7 +745,7 @@
               <span class="font-extrabold text-blue-900 text-lg">${order.id}</span>
               <span class="text-xs text-gray-500 mr-2">بواسطة: ${order.createdBy}</span>
             </div>
-            <span class="text-xs bg-yellow-200 text-yellow-800 font-bold px-2 py-1 rounded">الوزن الكلي: ${order.totalWeight} طن</span>
+            <span class="text-xs bg-yellow-200 text-yellow-800 font-bold px-2 py-1 rounded">الوزن: ${order.totalWeight} طن</span>
           </div>
           <div class="space-y-3">
             ${order.bls.map((b, idx) => `
@@ -596,7 +785,7 @@
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-semibold text-gray-600 mb-1">ملاحظات التحجيم (اختياري):</label>
+                <label class="block text-xs font-semibold text-gray-600 mb-1">ملاحظات التحجيم:</label>
                 <input type="text" id="m-notes-${order.id}" value="${currentValues[`notes-${order.id}`] || ''}" placeholder="أية ملاحظات..." class="w-full border rounded p-2 text-sm">
               </div>
             </div>
@@ -624,10 +813,61 @@
         body: JSON.stringify({
           measurements: { length: l, width: w, height: h },
           vehicleType,
-          shareefNotes
+          shareefNotes,
+          measuredBy: currentUser ? currentUser.name : 'موظف المستودع'
         })
       });
       loadData();
+    }
+
+    // شاشة الإنتاجية (فقط: إجمالي البوالص + إجمالي السيارات)
+    async function loadStats() {
+      const res = await fetch('/api/stats');
+      const stats = await res.json();
+      const container = document.getElementById('statsCardsContainer');
+
+      if (Object.keys(stats).length === 0) {
+        container.innerHTML = '<div class="col-span-3 text-center py-8 text-gray-400 font-bold">لا توجد بيانات إحصائية حتى الآن</div>';
+        return;
+      }
+
+      container.innerHTML = Object.entries(stats).map(([name, data]) => `
+        <div class="bg-gradient-to-br from-white to-gray-50 p-6 rounded-2xl border border-gray-200 shadow space-y-4">
+          <div class="flex justify-between items-center border-b pb-3">
+            <div>
+              <h3 class="font-bold text-xl text-blue-900">${name}</h3>
+              <span class="text-xs bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full font-semibold">${data.role}</span>
+            </div>
+            <div class="text-3xl">👤</div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4 text-center pt-2">
+            <div class="bg-blue-50 p-4 rounded-xl border border-blue-200">
+              <span class="text-xs text-gray-600 font-bold block mb-1">📋 عدد البوالص المنجزة</span>
+              <span class="text-3xl font-black text-blue-700">${data.totalBLs}</span>
+            </div>
+            <div class="bg-green-50 p-4 rounded-xl border border-green-200">
+              <span class="text-xs text-gray-600 font-bold block mb-1">🚚 عدد السيارات المطبوعة</span>
+              <span class="text-3xl font-black text-green-700">${data.totalCars}</span>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function exportStatsToExcel() {
+      fetch('/api/stats').then(r => r.json()).then(stats => {
+        const data = Object.entries(stats).map(([name, d]) => ({
+          'اسم الموظف': name,
+          'الدور': d.role,
+          'عدد البوالص المنجزة': d.totalBLs,
+          'عدد السيارات المطبوعة (الإجمالي)': d.totalCars
+        }));
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "إنتاجية الموظفين");
+        XLSX.writeFile(wb, `احصائية_انجاز_الموظفين_${new Date().toISOString().slice(0,10)}.xlsx`);
+      });
     }
 
     function renderArchive(filteredOrders = null) {
@@ -645,7 +885,6 @@
             <span class="font-bold text-blue-900">${b.blNumber}</span> 
             | <span class="text-gray-600">ALV: ${b.alvSerial || '-'}</span>
             | <span class="text-red-600 font-bold">${b.location || '-'}</span>
-            | <span>${b.weight}ط</span>
             ${b.clearanceCompany ? `| <span class="text-xs text-gray-500 font-semibold">${b.clearanceCompany}</span>` : ''}
           </div>
         `).join('');
@@ -655,6 +894,8 @@
           : '<span class="text-gray-400 text-xs">غير محدد</span>';
 
         const isDone = order.status === 'تم التحجيم';
+        const isManual = order.status === 'طباعة يدوية (احتياطية)';
+        const badgeClass = isDone ? 'badge-done' : (isManual ? 'badge-manual' : 'badge-tahjeem');
 
         return `
           <tr class="hover:bg-blue-50/50 transition">
@@ -662,13 +903,16 @@
               <div class="font-mono font-bold text-blue-900">${order.id}</div>
               <div class="text-xs text-gray-500">${new Date(order.createdAt).toLocaleDateString('ar-EG')} - ${new Date(order.createdAt).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})}</div>
             </td>
-            <td class="p-3 font-semibold text-gray-700">${order.createdBy || '-'}</td>
+            <td class="p-3">
+              <div class="font-bold text-gray-800">${order.createdBy || '-'}</div>
+              ${order.measuredBy ? `<div class="text-[11px] text-gray-400">حجّمها: ${order.measuredBy}</div>` : ''}
+            </td>
             <td class="p-3">${blsRows}</td>
             <td class="p-3 font-bold text-gray-900 whitespace-nowrap">${order.totalWeight} طن</td>
             <td class="p-3 whitespace-nowrap">${dims}</td>
             <td class="p-3 font-bold text-indigo-700 whitespace-nowrap">${order.vehicleType || '-'}</td>
             <td class="p-3">
-              <span class="px-2 py-0.5 rounded-full text-xs font-bold ${isDone ? 'badge-done' : 'badge-tahjeem'}">${order.status}</span>
+              <span class="px-2 py-0.5 rounded-full text-xs font-bold ${badgeClass}">${order.status}</span>
               ${order.shareefNotes ? `<div class="text-xs text-gray-500 mt-1 italic max-w-xs">📝 ${order.shareefNotes}</div>` : ''}
             </td>
             <td class="p-3 text-center whitespace-nowrap">
@@ -713,6 +957,7 @@
             'التاريخ': new Date(o.createdAt).toLocaleDateString('ar-EG'),
             'الوقت': new Date(o.createdAt).toLocaleTimeString('ar-EG'),
             'منشئ الطلب': o.createdBy,
+            'موظف التحجيم': o.measuredBy || '-',
             'الحالة': o.status,
             'نوع السيارة': o.vehicleType || '-',
             'البند': `بوليصة (${idx + 1})`,
@@ -754,6 +999,7 @@
       }, 1500);
     }
 
+    checkAuth();
     setInterval(loadData, 3000);
     loadData();
   </script>
