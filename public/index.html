@@ -16,9 +16,9 @@
 </head>
 <body class="bg-gray-100 text-gray-800 min-h-screen">
 
-  <!-- نافذة تسجيل الدخول (اختيار الموظف + باسوورد 8 خانات) -->
+  <!-- نافذة تسجيل الدخول الذكية -->
   <div id="loginModal" class="fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full border border-gray-100 space-y-6 text-center">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full border border-gray-100 space-y-5 text-center">
       <div class="w-16 h-16 bg-blue-100 text-blue-900 rounded-full flex items-center justify-center mx-auto text-3xl shadow-inner">
         📦
       </div>
@@ -29,9 +29,15 @@
 
       <div class="space-y-4 text-right">
         <div>
-          <label class="block text-xs font-bold text-gray-700 mb-1">اختر الموظف:</label>
+          <div class="flex justify-between items-center mb-1">
+            <label class="block text-xs font-bold text-gray-700">اختر الموظف:</label>
+            <!-- زر إضافة موظف جديد متاح مباشرة من شاشة الدخول -->
+            <button onclick="showAddUserModal()" type="button" class="text-blue-600 hover:text-blue-800 text-xs font-bold underline">
+              + إضافة موظف جديد
+            </button>
+          </div>
           <select id="loginUserSelect" onchange="onUserSelectChange()" class="w-full border-2 border-gray-200 rounded-lg p-3 text-sm font-bold focus:border-blue-600 focus:outline-none bg-gray-50">
-            <option value="">-- اضغط لاختيار اسمك --</option>
+            <option value="">-- جارٍ تحميل الموظفين... --</option>
           </select>
         </div>
 
@@ -56,7 +62,34 @@
     </div>
   </div>
 
-  <!-- الشريط العلوي -->
+  <!-- نافذة منبثقة لإضافة موظف جديد -->
+  <div id="addUserModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 hidden">
+    <div class="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full space-y-4 text-right">
+      <h3 class="font-black text-lg text-blue-900 border-b pb-2">إضافة موظف جديد</h3>
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-1">اسم الموظف الكامل:</label>
+        <input type="text" id="newUserName" placeholder="مثال: محمد علي" class="w-full border rounded-lg p-2.5 text-sm focus:ring-1 focus:ring-blue-600">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-1">القسم / الدور الوظيفي:</label>
+        <select id="newUserRole" class="w-full border rounded-lg p-2.5 text-sm font-semibold bg-gray-50">
+          <option value="cs">خدمة العملاء (Customer Service)</option>
+          <option value="warehouse">المستودع (موظف التحجيم)</option>
+        </select>
+      </div>
+      <div id="addUserError" class="text-red-600 text-xs font-bold hidden"></div>
+      <div class="flex gap-2 pt-2">
+        <button onclick="submitNewUser()" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg text-sm shadow">
+          حفظ وإضافة
+        </button>
+        <button onclick="hideAddUserModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 rounded-lg text-sm">
+          إلغاء
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- الشريط العلوي الرئيسي -->
   <nav class="bg-blue-900 text-white shadow-lg sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
       <div class="flex items-center space-x-3 space-x-reverse">
@@ -72,7 +105,7 @@
           <span id="navUserName" class="font-bold text-white">-</span>
           <span id="navUserRole" class="text-xs text-blue-200 bg-blue-950 px-2 py-0.5 rounded">-</span>
         </div>
-        <button onclick="showAddUserPrompt()" class="bg-blue-700 hover:bg-blue-600 text-white px-2.5 py-1.5 rounded text-xs transition">+ موظف جديد</button>
+        <button onclick="showAddUserModal()" class="bg-blue-700 hover:bg-blue-600 text-white px-2.5 py-1.5 rounded text-xs transition">+ موظف جديد</button>
         <button onclick="logout()" class="bg-rose-700 hover:bg-rose-800 text-white px-3 py-1.5 rounded text-xs font-bold transition">خروج</button>
       </div>
     </div>
@@ -214,7 +247,7 @@
       </div>
     </div>
 
-    <!-- 3. قسم إحصائيات وإنتاجية الموظفين (بوالص + سيارات فقط) -->
+    <!-- 3. قسم إحصائيات وإنتاجية الموظفين -->
     <div id="section-stats" class="hidden space-y-6">
       <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
         <div class="flex justify-between items-center mb-6 border-b pb-4 flex-wrap gap-4">
@@ -288,16 +321,33 @@
     let usersList = [];
     let currentUser = null;
 
+    // قائمة احتياطية في حال تأخر السيرفر
+    const fallbackUsers = [
+      { id: 'u1', name: 'أحمد رامي', role: 'cs', hasPassword: false },
+      { id: 'u2', name: 'كستمر سيرفس 1', role: 'cs', hasPassword: false },
+      { id: 'u3', name: 'كستمر سيرفس 2', role: 'cs', hasPassword: false },
+      { id: 'u4', name: 'موظف التحجيم 1', role: 'warehouse', hasPassword: false },
+      { id: 'u5', name: 'موظف التحجيم 2', role: 'warehouse', hasPassword: false }
+    ];
+
     async function loadUsersList() {
       try {
         const res = await fetch('/api/users/list');
-        usersList = await res.json();
-        const select = document.getElementById('loginUserSelect');
-        select.innerHTML = '<option value="">-- اضغط لاختيار اسمك --</option>' + 
-          usersList.map(u => `<option value="${u.id}">${u.name} (${u.role === 'cs' ? 'خدمة عملاء' : 'مستودع'})</option>`).join('');
+        if (res.ok) {
+          usersList = await res.json();
+        } else {
+          usersList = fallbackUsers;
+        }
       } catch (e) {
-        console.error('Error loading users:', e);
+        usersList = fallbackUsers;
       }
+      populateUsersDropdown();
+    }
+
+    function populateUsersDropdown() {
+      const select = document.getElementById('loginUserSelect');
+      select.innerHTML = '<option value="">-- اضغط لاختيار اسمك --</option>' + 
+        usersList.map(u => `<option value="${u.id}">${u.name} (${u.role === 'cs' ? 'خدمة عملاء' : 'مستودع'})</option>`).join('');
     }
 
     function onUserSelectChange() {
@@ -325,6 +375,48 @@
       } else {
         document.getElementById('loginModal').classList.remove('hidden');
         loadUsersList();
+      }
+    }
+
+    function showAddUserModal() {
+      document.getElementById('newUserName').value = '';
+      document.getElementById('addUserError').classList.add('hidden');
+      document.getElementById('addUserModal').classList.remove('hidden');
+    }
+
+    function hideAddUserModal() {
+      document.getElementById('addUserModal').classList.add('hidden');
+    }
+
+    async function submitNewUser() {
+      const name = document.getElementById('newUserName').value.trim();
+      const role = document.getElementById('newUserRole').value;
+      const err = document.getElementById('addUserError');
+      err.classList.add('hidden');
+
+      if (!name) {
+        err.innerText = 'يرجى إدخال اسم الموظف';
+        err.classList.remove('hidden');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/users/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, role })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'فشل إضافة الموظف');
+
+        hideAddUserModal();
+        await loadUsersList();
+        document.getElementById('loginUserSelect').value = data.id;
+        onUserSelectChange();
+        alert(`تمت إضافة الموظف (${name}) بنجاح! اختر كلمة مرور من 8 خانات واضغط دخول.`);
+      } catch (e) {
+        err.innerText = e.message;
+        err.classList.remove('hidden');
       }
     }
 
@@ -371,22 +463,6 @@
       localStorage.removeItem('tahjeem_user');
       currentUser = null;
       window.location.reload();
-    }
-
-    async function showAddUserPrompt() {
-      const name = prompt('اسم الموظف الجديد:');
-      if (!name) return;
-      const roleChoice = prompt('الدور: اكتب (cs) لخدمة العملاء، أو (warehouse) للمستودع:', 'cs');
-      const role = roleChoice === 'warehouse' ? 'warehouse' : 'cs';
-
-      const res = await fetch('/api/users/add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, role })
-      });
-      const data = await res.json();
-      if (!res.ok) alert(data.error || 'خطأ في إضافة الموظف');
-      else alert(`تمت إضافة الموظف (${name}) بنجاح.`);
     }
 
     async function loadData() {
@@ -496,7 +572,6 @@
       }
     }
 
-    // طباعة إشعار يدوي + حفظ بالداتا فوراً
     async function handleManualPrintAndSave() {
       const bls = getFilledBLs();
       if (bls.length === 0) {
@@ -820,7 +895,6 @@
       loadData();
     }
 
-    // شاشة الإنتاجية (فقط: إجمالي البوالص + إجمالي السيارات)
     async function loadStats() {
       const res = await fetch('/api/stats');
       const stats = await res.json();
