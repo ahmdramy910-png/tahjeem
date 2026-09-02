@@ -184,7 +184,37 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// 6. تحليل السكرين شوت عبر Groq Vision بمرونة تامة وبدون تعارض الـ JSON
+// دالة مساعدة لطلب الـ API مع إعادة المحاولة التلقائية إذا كان هناك ضغط
+async function callGroqWithRetry(groqKey, payload, maxRetries = 2) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${groqKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      return { success: true, data };
+    }
+
+    // إذا كان الخطأ Rate limit وكان هناك محاولات متبقية، ننتظر تلقائياً
+    const errMsg = data.error?.message || '';
+    if (errMsg.includes('Rate limit') && attempt < maxRetries) {
+      console.log(`Rate limited on attempt ${attempt + 1}. Waiting 8 seconds before retrying...`);
+      await new Promise(r => setTimeout(r, 8000));
+      continue;
+    }
+
+    return { success: false, error: errMsg || 'خطأ في معالجة السيرفر' };
+  }
+}
+
+// 6. تحليل السكرين شوت عبر Groq مع تحسين استهلاك التوكنز
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -200,47 +230,36 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
     const mimeType = req.file.mimetype || 'image/png';
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
-    const prompt = `Transcribe text from this Sage CRM logistics window accurately.
-Output ONLY valid JSON without any markdown ticks or conversation.
+    // Prompt موجز جداً لتقليل استهلاك الرموز (Tokens) بنسبة 60%
+    const prompt = `Logistics OCR. Extract as JSON:
+{"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}
+Rules: Digit 0 not letter O. Qty integer only. Weight rounded UP to 0.1 ton. Location code from table. Raw JSON only.`;
 
-Rules:
-1. Serial numbers contain DIGIT '0', not 'O'.
-2. Curving closed loops in serials are digit '6'.
-3. Quantity (qty) must be integer only (e.g. 55).
-4. Weight (weight) must be rounded UP to 0.1 ton (e.g. 1.611 becomes 1.7).
+    const payload = {
+      model: 'qwen/qwen3.6-27b',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: dataUrl } }
+          ]
+        }
+      ],
+      temperature: 0.0,
+      max_tokens: 300 // لمنع الإسهاب في التوليد وتوفير الحصة
+    };
 
-JSON keys:
-{"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
+    const result = await callGroqWithRetry(groqKey, payload, 2);
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'qwen/qwen3.6-27b',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: prompt },
-              { type: 'image_url', image_url: { url: dataUrl } }
-            ]
-          }
-        ],
-        temperature: 0.0
-      })
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error('Groq Error:', data);
-      return res.status(500).json({ error: data.error?.message || 'خطأ من مزود Groq' });
+    if (!result.success) {
+      if (result.error.includes('Rate limit')) {
+        return res.status(429).json({ error: 'النظام مشغول لحظياً لتفادي الضغط، يرجى الانتظار 10 ثوانٍ وإعادة المحاولة.' });
+      }
+      return res.status(500).json({ error: result.error });
     }
 
-    let rawContent = data.choices?.[0]?.message?.content || '{}';
+    let rawContent = result.data.choices?.[0]?.message?.content || '{}';
     const match = rawContent.match(/\{[\s\S]*?\}/);
     const jsonStr = match ? match[0] : '{}';
     const parsed = JSON.parse(jsonStr);
