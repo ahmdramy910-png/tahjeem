@@ -87,15 +87,15 @@ app.get('/api/users/list', async (req, res) => {
 app.post('/api/login', async (req, res) => {
   const { userId, password } = req.body;
   if (!userId || !password) {
-    return res.status(400).json({ error: 'يرجى اختيار الموظف وإدخال كلمة المرور' });
+    return res.status(400).json({ error: 'Please select an employee and enter password' });
   }
 
   const db = await loadDB();
   const user = db.users.find(u => u.id === userId);
-  if (!user) return res.status(404).json({ error: 'الموظف غير موجود' });
+  if (!user) return res.status(404).json({ error: 'Employee not found' });
 
   if (user.password !== password) {
-    return res.status(401).json({ error: 'كلمة المرور غير صحيحة' });
+    return res.status(401).json({ error: 'Incorrect password' });
   }
 
   res.json({
@@ -108,18 +108,18 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/users/register', async (req, res) => {
   const { name, role, password } = req.body;
   if (!name || !password) {
-    return res.status(400).json({ error: 'اسم الموظف وكلمة المرور مطلوبان' });
+    return res.status(400).json({ error: 'Name and password are required' });
   }
 
   if (password.length < 8) {
-    return res.status(400).json({ error: 'كلمة المرور يجب أن تتكون من 8 خانات على الأقل' });
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
   }
 
   const db = await loadDB();
   const cleanName = name.trim();
   
   if (db.users.some(u => u.name.toLowerCase() === cleanName.toLowerCase())) {
-    return res.status(400).json({ error: 'هذا الاسم مسجل مسبقاً' });
+    return res.status(400).json({ error: 'This employee name is already registered' });
   }
 
   const newId = 'u_' + Date.now();
@@ -145,14 +145,14 @@ app.get('/api/data', async (req, res) => {
   res.json({ orders: db.orders });
 });
 
-// 5. إحصائيات إنتاجية الموظفين (بوالص + سيارات)
+// 5. إحصائيات إنتاجية الموظفين
 app.get('/api/stats', async (req, res) => {
   const db = await loadDB();
   const stats = {};
 
   (db.users || []).forEach(u => {
     stats[u.name] = {
-      role: u.role === 'cs' ? 'خدمة عملاء' : 'مستودع وتحجيم',
+      role: u.role === 'cs' ? 'Customer Service' : 'Warehouse',
       totalBLs: 0,
       totalCars: 0
     };
@@ -165,7 +165,7 @@ app.get('/api/stats', async (req, res) => {
     const creator = order.createdBy;
     if (creator) {
       if (!stats[creator]) {
-        stats[creator] = { role: 'موظف', totalBLs: 0, totalCars: 0 };
+        stats[creator] = { role: 'Employee', totalBLs: 0, totalCars: 0 };
       }
       stats[creator].totalBLs += blCount;
       stats[creator].totalCars += 1;
@@ -174,7 +174,7 @@ app.get('/api/stats', async (req, res) => {
     const measurer = order.measuredBy;
     if (measurer && measurer !== creator && order.status === 'تم التحجيم') {
       if (!stats[measurer]) {
-        stats[measurer] = { role: 'مستودع وتحجيم', totalBLs: 0, totalCars: 0 };
+        stats[measurer] = { role: 'Warehouse', totalBLs: 0, totalCars: 0 };
       }
       stats[measurer].totalBLs += blCount;
       stats[measurer].totalCars += 1;
@@ -184,85 +184,84 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// دالة مساعدة لطلب الـ API مع إعادة المحاولة التلقائية إذا كان هناك ضغط
-async function callGroqWithRetry(groqKey, payload, maxRetries = 2) {
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      return { success: true, data };
-    }
-
-    // إذا كان الخطأ Rate limit وكان هناك محاولات متبقية، ننتظر تلقائياً
-    const errMsg = data.error?.message || '';
-    if (errMsg.includes('Rate limit') && attempt < maxRetries) {
-      console.log(`Rate limited on attempt ${attempt + 1}. Waiting 8 seconds before retrying...`);
-      await new Promise(r => setTimeout(r, 8000));
-      continue;
-    }
-
-    return { success: false, error: errMsg || 'خطأ في معالجة السيرفر' };
-  }
-}
-
-// 6. تحليل السكرين شوت عبر Groq مع تحسين استهلاك التوكنز
+// 6. تحليل السكرين شوت بدقة فائقة ومعالجة شاملة للأخطاء
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: 'لم يتم استلام ملف صورة' });
+      return res.status(400).json({ error: 'No image uploaded' });
     }
 
     const groqKey = process.env.GROQ_API_KEY;
     if (!groqKey) {
-      return res.status(500).json({ error: 'مفتاح GROQ_API_KEY غير معرف في Render' });
+      return res.status(500).json({ error: 'GROQ_API_KEY is not defined in Render environment variables' });
     }
 
     const base64Image = req.file.buffer.toString('base64');
     const mimeType = req.file.mimetype || 'image/png';
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
-    // Prompt موجز جداً لتقليل استهلاك الرموز (Tokens) بنسبة 60%
-    const prompt = `Logistics OCR. Extract as JSON:
-{"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}
-Rules: Digit 0 not letter O. Qty integer only. Weight rounded UP to 0.1 ton. Location code from table. Raw JSON only.`;
+    const prompt = `Logistics OCR. Extract values from Sage CRM window into a JSON object.
+Rules:
+1. Digits '0' not letter 'O'.
+2. Qty is whole integer only.
+3. Weight in tons rounded UP to 0.1 ton.
+4. Clearance company and Location code accurately transcribed.
 
-    const payload = {
-      model: 'qwen/qwen3.6-27b',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: prompt },
-            { type: 'image_url', image_url: { url: dataUrl } }
-          ]
-        }
-      ],
-      temperature: 0.0,
-      max_tokens: 300 // لمنع الإسهاب في التوليد وتوفير الحصة
-    };
+JSON keys:
+{"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
 
-    const result = await callGroqWithRetry(groqKey, payload, 2);
+    let response = null;
+    let data = null;
 
-    if (!result.success) {
-      if (result.error.includes('Rate limit')) {
-        return res.status(429).json({ error: 'النظام مشغول لحظياً لتفادي الضغط، يرجى الانتظار 10 ثوانٍ وإعادة المحاولة.' });
+    // محاولة مع معالجة ذكية لضغط الـ Rate Limit
+    for (let attempt = 0; attempt < 2; attempt++) {
+      response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${groqKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'qwen/qwen3.6-27b',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: prompt },
+                { type: 'image_url', image_url: { url: dataUrl } }
+              ]
+            }
+          ],
+          temperature: 0.0,
+          max_tokens: 1024
+        })
+      });
+
+      data = await response.json();
+
+      if (response.ok) break;
+
+      const errMsg = data.error?.message || '';
+      if (errMsg.includes('Rate limit') && attempt === 0) {
+        console.log('Rate limit reached, retrying in 5 seconds...');
+        await new Promise(r => setTimeout(r, 5000));
+        continue;
+      } else {
+        return res.status(response.status).json({ error: errMsg || 'Groq API request failed' });
       }
-      return res.status(500).json({ error: result.error });
     }
 
-    let rawContent = result.data.choices?.[0]?.message?.content || '{}';
+    const rawContent = data.choices?.[0]?.message?.content || '';
+    if (!rawContent) {
+      return res.status(500).json({ error: 'Empty response received from OCR engine' });
+    }
+
     const match = rawContent.match(/\{[\s\S]*?\}/);
-    const jsonStr = match ? match[0] : '{}';
-    const parsed = JSON.parse(jsonStr);
+    if (!match) {
+      return res.status(500).json({ error: 'Could not parse logistics data. Raw output: ' + rawContent.slice(0, 100) });
+    }
+
+    const parsed = JSON.parse(match[0]);
 
     if (parsed.qty) {
       const cleanQty = parseInt(String(parsed.qty).replace(/,/g, ''), 10);
@@ -277,7 +276,7 @@ Rules: Digit 0 not letter O. Qty integer only. Weight rounded UP to 0.1 ton. Loc
 
   } catch (err) {
     console.error('OCR Endpoint Error:', err);
-    return res.status(500).json({ error: 'فشل معالجة الصورة: ' + err.message });
+    return res.status(500).json({ error: 'Internal Server Error: ' + err.message });
   }
 });
 
@@ -287,7 +286,7 @@ app.post('/api/orders', async (req, res) => {
   const newOrder = {
     id: 'ORD-' + Math.floor(100000 + Math.random() * 900000),
     createdAt: new Date().toISOString(),
-    createdBy: req.body.createdBy || 'خدمة العملاء',
+    createdBy: req.body.createdBy || 'Customer Service',
     status: req.body.isManual ? 'طباعة يدوية' : 'بانتظار التحجيم',
     isManualPrint: !!req.body.isManual,
     bls: req.body.bls || [],
@@ -307,12 +306,12 @@ app.post('/api/orders', async (req, res) => {
 app.patch('/api/orders/:id/tahjeem', async (req, res) => {
   const db = await loadDB();
   const order = db.orders.find(o => o.id === req.params.id);
-  if (!order) return res.status(404).json({ error: 'الطلب غير موجود' });
+  if (!order) return res.status(404).json({ error: 'Order not found' });
 
   order.measurements = req.body.measurements;
   order.vehicleType = req.body.vehicleType || '';
   order.shareefNotes = req.body.shareefNotes || '';
-  order.measuredBy = req.body.measuredBy || 'موظف المستودع';
+  order.measuredBy = req.body.measuredBy || 'Warehouse Staff';
   order.status = 'تم التحجيم';
   order.completedAt = new Date().toISOString();
 
@@ -335,7 +334,7 @@ app.delete('/api/orders/clear-all', async (req, res) => {
   const db = await loadDB();
   db.orders = [];
   await saveDB(db);
-  res.json({ success: true, message: 'تم تفريغ الأرشيف بالكامل' });
+  res.json({ success: true, message: 'Archive cleared completely' });
 });
 
 const PORT = process.env.PORT || 10000;
