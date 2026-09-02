@@ -16,7 +16,7 @@
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen">
 
-  <!-- Sign In / Register Overlay (LTR English Interface) -->
+  <!-- Sign In / Register Overlay -->
   <div id="loginOverlay" class="fixed inset-0 bg-slate-900 bg-opacity-95 z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full border border-slate-200 text-center space-y-5">
       
@@ -316,7 +316,6 @@
     let usersList = [];
     let currentUser = null;
 
-    // دالة تنسيق الوقت 12 ساعة بنظام AM/PM
     function formatTime12(dateObj) {
       return dateObj.toLocaleTimeString('en-US', {
         hour: '2-digit',
@@ -326,7 +325,7 @@
     }
 
     function formatDateEn(dateObj) {
-      return dateObj.toLocaleDateString('en-GB'); // DD/MM/YYYY
+      return dateObj.toLocaleDateString('en-GB');
     }
 
     function switchAuthMode(mode) {
@@ -538,7 +537,7 @@
       if (!file) return;
 
       const btnLabel = document.getElementById(`btn-ocr-${index}`);
-      btnLabel.innerHTML = '<span>⏳ Processing...</span>';
+      btnLabel.innerHTML = '<span>⏳</span>';
       btnLabel.classList.add('opacity-75');
 
       const formData = new FormData();
@@ -546,8 +545,11 @@
 
       try {
         const res = await fetch('/api/ocr', { method: 'POST', body: formData });
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
+        const data = await res.json().catch(() => ({ error: 'Invalid response from server' }));
+
+        if (!res.ok || data.error) {
+          throw new Error(data.error || `Server returned error (${res.status})`);
+        }
 
         document.getElementById(`bl-${index}-no`).value = data.blNumber || '';
         document.getElementById(`bl-${index}-alv`).value = data.alvSerial || '';
@@ -559,10 +561,11 @@
 
         calcTotalWeight();
       } catch (err) {
-        alert('OCR Alert: ' + err.message);
+        alert('OCR Error: ' + err.message);
       } finally {
         btnLabel.innerHTML = '<span>📷</span><input type="file" accept="image/*" class="hidden" onchange="handleOCR(event, ' + index + ')">';
         btnLabel.classList.remove('opacity-75');
+        e.target.value = '';
       }
     }
 
@@ -629,7 +632,7 @@
       calcTotalWeight();
     }
 
-    // ورقة الطباعة الرسمية: عادت بالكامل باللغة العربية ومحاذاة اليمين مع الوقت 12 ساعة
+    // ورقة الطباعة الرسمية: بالعربي ومحاذاة اليمين مع الوقت 12 ساعة
     function printFormalSlip(orderId) {
       let clearanceCompany = '';
       let dateStr = '';
@@ -949,7 +952,6 @@
       `).join('');
     }
 
-    // تصدير إحصائية الإنتاجية إلى إكسل باللغة العربية
     function exportStatsToExcel() {
       fetch('/api/stats').then(r => r.json()).then(stats => {
         const data = Object.entries(stats).map(([name, d]) => ({
@@ -1047,7 +1049,6 @@
       renderArchive(filtered);
     }
 
-    // تصدير سجل الطلبات والأرشيف إلى إكسل باللغة العربية
     function exportToExcel() {
       const data = [];
       state.orders.forEach(o => {
