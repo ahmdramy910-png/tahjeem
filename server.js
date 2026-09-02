@@ -184,7 +184,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// 6. تحليل السكرين شوت بدقة فائقة ومعالجة الأخطاء
+// 6. تحليل السكرين شوت مع التخلص التام من ثرثرة التفكير (<think>)
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -193,22 +193,21 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
 
     const groqKey = process.env.GROQ_API_KEY;
     if (!groqKey) {
-      return res.status(500).json({ error: 'GROQ_API_KEY is not defined in Render environment variables' });
+      return res.status(500).json({ error: 'GROQ_API_KEY is missing' });
     }
 
     const base64Image = req.file.buffer.toString('base64');
     const mimeType = req.file.mimetype || 'image/png';
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
-    const prompt = `Logistics OCR. Extract values from Sage CRM window into a JSON object.
+    const prompt = `DO NOT THINK. DO NOT REASON. Output raw JSON directly without preamble or markdown.
+Extract Sage CRM fields:
+{"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}
 Rules:
-1. Digits '0' not letter 'O'.
-2. Qty is whole integer only.
-3. Weight in tons rounded UP to 0.1 ton.
-4. Clearance company and Location code accurately transcribed.
-
-JSON keys:
-{"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
+- Serial numbers contain DIGIT '0', not letter 'O'.
+- Qty must be whole integer.
+- Weight rounded UP to nearest 0.1 ton.
+- Accurate clearance company name and warehouse location code.`;
 
     let response = null;
     let data = null;
@@ -232,32 +231,32 @@ JSON keys:
             }
           ],
           temperature: 0.0,
-          max_tokens: 1024
+          max_tokens: 2048
         })
       });
 
       data = await response.json();
-
       if (response.ok) break;
 
       const errMsg = data.error?.message || '';
       if (errMsg.includes('Rate limit') && attempt === 0) {
-        console.log('Rate limit reached, retrying in 5 seconds...');
-        await new Promise(r => setTimeout(r, 5000));
+        await new Promise(r => setTimeout(r, 6000));
         continue;
       } else {
-        return res.status(response.status).json({ error: errMsg || 'Groq API request failed' });
+        return res.status(response.status).json({ error: errMsg || 'OCR request failed' });
       }
     }
 
-    const rawContent = data.choices?.[0]?.message?.content || '';
-    if (!rawContent) {
-      return res.status(500).json({ error: 'Empty response received from OCR engine' });
-    }
+    let rawContent = data.choices?.[0]?.message?.content || '';
 
+    // إزالة وسوم التفكير نهائياً إذا قام النموذج بكتابتها
+    rawContent = rawContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+    // البحث عن أول كائن JSON صالح
     const match = rawContent.match(/\{[\s\S]*?\}/);
     if (!match) {
-      return res.status(500).json({ error: 'Could not parse logistics data: ' + rawContent.slice(0, 100) });
+      console.error('Raw content failed parse:', rawContent);
+      return res.status(500).json({ error: 'Failed to extract JSON. Content was: ' + rawContent.slice(0, 80) });
     }
 
     const parsed = JSON.parse(match[0]);
@@ -275,7 +274,7 @@ JSON keys:
 
   } catch (err) {
     console.error('OCR Endpoint Error:', err);
-    return res.status(500).json({ error: 'Internal Server Error: ' + err.message });
+    return res.status(500).json({ error: 'Server Error: ' + err.message });
   }
 });
 
