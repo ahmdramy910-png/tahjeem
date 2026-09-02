@@ -184,7 +184,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// 6. تحليل السكرين شوت بدقة فائقة ومعالجة شاملة للأخطاء
+// 6. تحليل السكرين شوت بدقة فائقة ومعالجة الأخطاء
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -213,7 +213,6 @@ JSON keys:
     let response = null;
     let data = null;
 
-    // محاولة مع معالجة ذكية لضغط الـ Rate Limit
     for (let attempt = 0; attempt < 2; attempt++) {
       response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -258,7 +257,7 @@ JSON keys:
 
     const match = rawContent.match(/\{[\s\S]*?\}/);
     if (!match) {
-      return res.status(500).json({ error: 'Could not parse logistics data. Raw output: ' + rawContent.slice(0, 100) });
+      return res.status(500).json({ error: 'Could not parse logistics data: ' + rawContent.slice(0, 100) });
     }
 
     const parsed = JSON.parse(match[0]);
