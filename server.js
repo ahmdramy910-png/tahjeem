@@ -90,47 +90,49 @@ app.post('/api/employees', async (req, res) => {
   res.json({ employees: db.employees });
 });
 
-// 3. تحليل السكرين شوت بالذكاء الاصطناعي
+// 3. تحليل السكرين شوت بالذكاء الاصطناعي (سريع ومجاني 100% عبر OpenRouter)
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'لم يتم استلام ملف صورة' });
     }
 
-    const apiKey = process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: 'مفتاح الـ API غير معرف في Render' });
+    const openrouterKey = process.env.OPENROUTER_API_KEY;
+    if (!openrouterKey) {
+      return res.status(500).json({ error: 'مفتاح OPENROUTER_API_KEY غير معرف في Render' });
     }
 
     const base64Image = req.file.buffer.toString('base64');
-    const mimeType = req.file.mimetype || 'image/png';
+    const mimeType = req.file.mimetype || 'image/jpeg';
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
-    const prompt = `
-أنت نظام استخراج بيانات لشاشة Sage CRM لنظام LCL في شركة لوجستية.
-استخرج الحقول التالية بدقة من الصورة وأرجع فقط كائن JSON صالح بالحقول التالية:
+    const prompt = `You are a strict data extractor for Sage CRM LCL window.
+Extract these exact fields from the image into JSON:
 {
-  "blNumber": "رقم البوليصة من خانة B/L No.",
-  "alvSerial": "رقم ALV Serial",
-  "qty": "العدد من خانة QTY كرقم صحيح",
-  "weight": "الوزن من Weight(Ton) مقرباً للرقم الأعلى بمقدار 0.1 (مثال: إذا كان 1.611 اجعله 1.7)",
-  "pallets": "عدد البلتات من خانة ALV Pallet كرقم",
-  "location": "الموقع من جدول B\\L Location في الأسفل (الأكثر تكراراً)",
-  "clearanceCompany": "اسم شركة التخليص من Company clearance"
+  "blNumber": "B/L No.",
+  "alvSerial": "ALV Serial",
+  "qty": "QTY as integer",
+  "weight": "Weight(Ton) rounded UP to the nearest 0.1 (e.g., 1.611 becomes 1.7)",
+  "pallets": "ALV Pallet as integer",
+  "location": "Most frequent location code from the bottom table",
+  "clearanceCompany": "Company clearance name"
 }
-إذا تعذر قراءة حقل معين، اتركه قيمة نصية فارغة "". أرجع الـ JSON فقط بدون markdown.
-`;
+Return valid raw JSON ONLY. No explanation, no markdown backticks.`;
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${openrouterKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://tahjeem.onrender.com',
         'X-Title': 'Tahjeem Logistics System'
       },
       body: JSON.stringify({
-        model: 'openrouter/free',
+        model: 'google/gemma-4-26b-a4b-it:free',
+        models: [
+          'google/gemma-4-26b-a4b-it:free',
+          'openrouter/free'
+        ],
         messages: [
           {
             role: 'user',
@@ -140,7 +142,9 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
             ]
           }
         ],
-        response_format: { type: 'json_object' }
+        response_format: { type: 'json_object' },
+        temperature: 0.1,
+        max_tokens: 300
       })
     });
 
@@ -148,7 +152,7 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
 
     if (!response.ok) {
       console.error('OpenRouter Error:', data);
-      return res.status(500).json({ error: data.error?.message || 'خطأ في معالجة مزود الذكاء الاصطناعي' });
+      return res.status(500).json({ error: data.error?.message || 'خطأ من مزود OpenRouter' });
     }
 
     let rawContent = data.choices?.[0]?.message?.content || '{}';
@@ -198,7 +202,7 @@ app.patch('/api/orders/:id/tahjeem', async (req, res) => {
   res.json(order);
 });
 
-// 6. حذف الطلبات حسب عدد الأيام (تنظيف المساحة)
+// 6. حذف الطلبات القديمة
 app.delete('/api/orders/clean', async (req, res) => {
   const days = parseInt(req.query.days) || 7;
   const db = await loadDB();
@@ -208,7 +212,7 @@ app.delete('/api/orders/clean', async (req, res) => {
   res.json({ success: true, count: db.orders.length });
 });
 
-// 7. تفريغ كامل الأرشيف (تصفير المساحة بعد التصدير)
+// 7. تفريغ كامل الأرشيف
 app.delete('/api/orders/clear-all', async (req, res) => {
   const db = await loadDB();
   db.orders = [];
