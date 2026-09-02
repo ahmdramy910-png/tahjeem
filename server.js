@@ -35,9 +35,19 @@ if (MONGODB_URI) {
     .then(async () => {
       isConnectedToMongo = true;
       console.log('✅ Connected permanently to MongoDB Atlas');
+      
+      // تفريغ اليوزرات القديمة المخزنة في MongoDB لتبدأ نظيفة تماماً
       const doc = await AppState.findOne({ key: 'main_state' });
-      if (!doc) {
-        await AppState.create({ key: 'main_state', ...memoryState });
+      if (doc) {
+        // إذا كان فيها الأسماء الافتراضية القديمة يتم تصفيرها
+        const hasOldDefaults = doc.users.some(u => u.name && (u.name.includes('كستمر') || u.name.includes('التحجيم 1')));
+        if (hasOldDefaults) {
+          doc.users = [];
+          await doc.save();
+          console.log('🧹 Old default users cleared from MongoDB successfully');
+        }
+      } else {
+        await AppState.create({ key: 'main_state', users: [], orders: [] });
       }
     })
     .catch(err => {
@@ -72,7 +82,7 @@ async function saveDB(data) {
   }
 }
 
-// 1. جلب قائمة الموظفين المسجلين
+// 1. جلب قائمة الموظفين
 app.get('/api/users/list', async (req, res) => {
   const db = await loadDB();
   const list = (db.users || []).map(u => ({
@@ -137,6 +147,14 @@ app.post('/api/users/register', async (req, res) => {
     success: true,
     user: { id: newUser.id, name: newUser.name, role: newUser.role }
   });
+});
+
+// مسار إضافي لتنظيف أي يوزر قديم بضغطة زر إذا لزم الأمر
+app.delete('/api/users/reset', async (req, res) => {
+  const db = await loadDB();
+  db.users = [];
+  await saveDB(db);
+  res.json({ success: true, message: 'تم تصفير كل المستخدمين بنجاح' });
 });
 
 // 4. جلب الطلبات
