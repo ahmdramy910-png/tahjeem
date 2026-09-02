@@ -90,7 +90,7 @@ app.post('/api/employees', async (req, res) => {
   res.json({ employees: db.employees });
 });
 
-// 3. تحليل السكرين شوت بالذكاء الاصطناعي (OpenRouter Free Model القديم)
+// 3. تحليل السكرين شوت بدقة فائقة وإزالة الأصفار العشرية للعدد
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -106,18 +106,27 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
     const mimeType = req.file.mimetype || 'image/png';
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
-    const prompt = `You are a strict data extractor for Sage CRM LCL window.
-Extract these exact fields from the image into JSON:
-{
-  "blNumber": "B/L No.",
-  "alvSerial": "ALV Serial",
-  "qty": "QTY as integer",
-  "weight": "Weight(Ton) rounded UP to the nearest 0.1 (e.g., 1.611 becomes 1.7)",
-  "pallets": "ALV Pallet as integer",
-  "location": "Most frequent location code from the bottom table",
-  "clearanceCompany": "Company clearance name"
-}
-Return valid raw JSON ONLY. No explanation, no markdown backticks.`;
+    const prompt = `You are a precision OCR engine for Sage CRM logistics windows.
+Transcribe text with 100% exact alphanumeric accuracy without omitting any characters.
+
+STRICT CHARACTER & FORMAT RULES:
+1. '0' vs 'O': Serial numbers, ALV numbers, and B/L identifiers contain the DIGIT '0', NOT the letter 'O'.
+2. '6' vs 'G': Closed curved loops in serials are digit '6'.
+3. '1' vs 'I'/'l': Pure numeric segments use digit '1'.
+4. COMPLETE TEXT: Do not drop, skip, or shorten any characters from B/L No. or ALV Serial.
+5. QUANTITY (qty): MUST be a whole integer ONLY. If the CRM shows trailing decimals like "55.000" or "12.0", strip the decimal completely and return only the integer (e.g. 55, 12).
+
+FIELDS TO EXTRACT:
+- blNumber: Full B/L No. exactly as shown.
+- alvSerial: Full ALV Serial exactly as shown.
+- qty: Whole integer quantity (e.g., 55 instead of 55.000).
+- weight: Weight in tons rounded UP to the nearest 0.1 ton (e.g., 1.611 becomes 1.7).
+- pallets: ALV Pallet count as integer.
+- location: Primary storage location code from the bottom table.
+- clearanceCompany: Full clearance company name.
+
+Return valid JSON ONLY in this format:
+{"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -138,7 +147,7 @@ Return valid raw JSON ONLY. No explanation, no markdown backticks.`;
             ]
           }
         ],
-        temperature: 0.1
+        temperature: 0.0
       })
     });
 
@@ -153,6 +162,18 @@ Return valid raw JSON ONLY. No explanation, no markdown backticks.`;
     const match = rawContent.match(/\{[\s\S]*\}/);
     const jsonStr = match ? match[0] : '{}';
     const parsed = JSON.parse(jsonStr);
+
+    // تنظيف برمجي إضافي للعدد لضمان إزالة أي أصفار عشرية
+    if (parsed.qty) {
+      const cleanQty = parseInt(String(parsed.qty).replace(/,/g, ''), 10);
+      parsed.qty = isNaN(cleanQty) ? parsed.qty : String(cleanQty);
+    }
+
+    // تنظيف لعدد البلتات أيضاً كعدد صحيح
+    if (parsed.pallets) {
+      const cleanPallets = parseInt(String(parsed.pallets).replace(/,/g, ''), 10);
+      parsed.pallets = isNaN(cleanPallets) ? parsed.pallets : String(cleanPallets);
+    }
 
     return res.json(parsed);
 
@@ -198,7 +219,7 @@ app.patch('/api/orders/:id/tahjeem', async (req, res) => {
   res.json(order);
 });
 
-// 6. حذف الطلبات القديمة لتفريغ المساحة
+// 6. حذف الطلبات القديمة
 app.delete('/api/orders/clean', async (req, res) => {
   const days = parseInt(req.query.days) || 7;
   const db = await loadDB();
