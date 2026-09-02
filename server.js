@@ -90,7 +90,7 @@ app.post('/api/employees', async (req, res) => {
   res.json({ employees: db.employees });
 });
 
-// 3. تحليل السكرين شوت فائق السرعة عبر Gemini Flash (1 - 2 ثانية فقط)
+// 3. تحليل السكرين شوت فائق السرعة عبر Gemini Flash (1 إلى 2 ثانية)
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -117,7 +117,7 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
 }
 Return valid raw JSON only. Do not wrap in markdown backticks.`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${geminiKey}`;
 
     const response = await fetch(url, {
       method: 'POST',
