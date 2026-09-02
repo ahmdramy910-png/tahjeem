@@ -184,7 +184,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// 6. تحليل السكرين شوت عبر Groq Vision
+// 6. تحليل السكرين شوت بالموديل البصري النشط والمعتمد رسمياً على Groq
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -222,53 +222,33 @@ FIELDS TO EXTRACT:
 Return valid JSON ONLY in this format:
 {"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
 
-    const candidateModels = [
-      'meta-llama/llama-4-scout-17b-vision',
-      'meta-llama/llama-4-scout'
-    ];
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${groqKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'qwen/qwen3.6-27b',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: dataUrl } }
+            ]
+          }
+        ],
+        temperature: 0.0,
+        response_format: { type: 'json_object' }
+      })
+    });
 
-    let lastError = null;
-    let data = null;
+    const data = await response.json();
 
-    for (const model of candidateModels) {
-      try {
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${groqKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: model,
-            messages: [
-              {
-                role: 'user',
-                content: [
-                  { type: 'text', text: prompt },
-                  { type: 'image_url', image_url: { url: dataUrl } }
-                ]
-              }
-            ],
-            temperature: 0.0,
-            response_format: { type: 'json_object' }
-          })
-        });
-
-        data = await response.json();
-        if (response.ok) {
-          lastError = null;
-          break;
-        } else {
-          lastError = data.error?.message || 'Groq error';
-        }
-      } catch (err) {
-        lastError = err.message;
-      }
-    }
-
-    if (lastError) {
-      console.error('Groq OCR Error:', lastError);
-      return res.status(500).json({ error: lastError });
+    if (!response.ok) {
+      console.error('Groq Error:', data);
+      return res.status(500).json({ error: data.error?.message || 'خطأ من مزود Groq' });
     }
 
     let rawContent = data.choices?.[0]?.message?.content || '{}';
