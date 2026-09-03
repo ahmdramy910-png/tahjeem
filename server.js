@@ -81,7 +81,7 @@ app.post('/api/login', async (req, res) => {
   res.json({ success: true, user: { id: user.id, name: user.name, role: user.role } });
 });
 
-// 3. إنشاء حساب جديد
+// 3. تسجيل موظف جديد
 app.post('/api/users/register', async (req, res) => {
   const { name, role, password } = req.body;
   if (!name || !password || password.length < 8) {
@@ -127,12 +127,11 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// 6. OCR عبر GitHub Models بالرابط الرسمي
+// 6. تحليل السكرين شوت عبر GitHub Models باستخدام gpt-4o-mini المعتمد
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image provided' });
 
-    // قراءة مفتاحك من Render
     const token = process.env.ai_yahjeem;
     if (!token) return res.status(500).json({ error: 'ai_yahjeem variable is missing in Render Environment' });
 
@@ -141,7 +140,7 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
     const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
     const prompt = `Logistics OCR task for Sage CRM window.
-Extract the logistics values accurately. Respond ONLY with a valid JSON object. No intro, no reasoning, no markdown backticks.
+Extract the logistics values accurately. Respond ONLY with a valid JSON object. No preamble, no backticks.
 
 RULES:
 1. Alphanumerics: Serial numbers and B/L identifiers always contain the DIGIT '0', NOT letter 'O'.
@@ -152,7 +151,6 @@ RULES:
 Output strictly:
 {"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
 
-    // عنوان GitHub Models الرسمي
     const response = await fetch('https://models.github.ai/inference/chat/completions', {
       method: 'POST',
       headers: {
@@ -160,7 +158,7 @@ Output strictly:
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'Llama-3.2-11B-Vision-Instruct',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'user',
@@ -171,7 +169,7 @@ Output strictly:
           }
         ],
         temperature: 0.0,
-        max_tokens: 1024
+        response_format: { type: "json_object" }
       })
     });
 
@@ -256,7 +254,7 @@ app.delete('/api/orders/clean', async (req, res) => {
   res.json({ success: true, count: db.orders.length });
 });
 
-// 10. تفريغ كامل الأرشيف
+// 10. تفريغ الأرشيف
 app.delete('/api/orders/clear-all', async (req, res) => {
   const db = await loadDB();
   db.orders = [];
