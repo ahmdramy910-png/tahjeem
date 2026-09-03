@@ -184,7 +184,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// 6. تحليل السكرين شوت عبر OpenRouter بالموديلات النشطة مع الاحتياط
+// 6. تحليل السكرين شوت عبر OpenRouter مع موديلات مؤكدة الوجود ومستقرة
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -200,27 +200,29 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
     const mimeType = req.file.mimetype || 'image/png';
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
-    const prompt = `You are a precision OCR engine for logistics Sage CRM windows.
-Extract the values and return a valid JSON object ONLY. No conversational text or markdown blocks.
+    const prompt = `Logistics OCR for Sage CRM window.
+Extract the fields and return a single valid JSON object ONLY. No conversational text, no markdown.
 
-Rules:
-1. Digits '0' not letter 'O'.
-2. QTY must be integer only (e.g. 55).
-3. Weight rounded UP to 0.1 ton (e.g. 1.611 becomes 1.7).
-4. Location code and Clearance company extracted accurately.
+RULES:
+- '0' vs 'O': Serial numbers and B/L identifiers always contain DIGIT '0', NOT letter 'O'.
+- QUANTITY (qty): Whole integer only.
+- WEIGHT (weight): Weight in tons rounded UP to nearest 0.1 ton.
+- Accurate location code and clearance company.
 
-JSON Keys:
+JSON Structure:
 {"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
 
-    const activeModels = [
-      'meta-llama/llama-3.2-11b-vision-instruct:free',
-      'qwen/qwen-2.5-vl-72b-instruct:free'
+    // قائمة الموديلات البصرية المستقرة والمتاحة دائماً على OpenRouter
+    const modelsToTry = [
+      'google/gemini-2.0-flash-001',
+      'google/gemini-flash-1.5',
+      'meta-llama/llama-3.2-11b-vision-instruct'
     ];
 
     let lastError = null;
-    let data = null;
+    let successfulData = null;
 
-    for (const model of activeModels) {
+    for (const model of modelsToTry) {
       try {
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
@@ -245,27 +247,29 @@ JSON Keys:
           })
         });
 
-        data = await response.json();
-        if (response.ok) {
+        const data = await response.json();
+
+        if (response.ok && data.choices?.[0]?.message?.content) {
+          successfulData = data;
           lastError = null;
           break;
         } else {
-          lastError = data.error?.message || 'OpenRouter model unavailable';
+          lastError = data.error?.message || `Failed on ${model}`;
         }
       } catch (err) {
         lastError = err.message;
       }
     }
 
-    if (lastError) {
-      console.error('OpenRouter Error:', lastError);
-      return res.status(500).json({ error: lastError });
+    if (!successfulData) {
+      console.error('OpenRouter Failed:', lastError);
+      return res.status(500).json({ error: 'OpenRouter OCR Error: ' + lastError });
     }
 
-    let rawContent = data.choices?.[0]?.message?.content || '';
+    let rawContent = successfulData.choices[0].message.content;
     const match = rawContent.match(/\{[\s\S]*?\}/);
     if (!match) {
-      return res.status(500).json({ error: 'Could not extract JSON data from OpenRouter response' });
+      return res.status(500).json({ error: 'Could not extract valid JSON: ' + rawContent.slice(0, 100) });
     }
 
     const parsed = JSON.parse(match[0]);
