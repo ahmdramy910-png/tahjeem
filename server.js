@@ -64,13 +64,13 @@ async function saveDB(data) {
   }
 }
 
-// 1. قائمة الموظفين
+// 1. Users List
 app.get('/api/users/list', async (req, res) => {
   const db = await loadDB();
   res.json((db.users || []).map(u => ({ id: u.id, name: u.name, role: u.role })));
 });
 
-// 2. تسجيل الدخول
+// 2. Login
 app.post('/api/login', async (req, res) => {
   const { userId, password } = req.body;
   const db = await loadDB();
@@ -81,7 +81,7 @@ app.post('/api/login', async (req, res) => {
   res.json({ success: true, user: { id: user.id, name: user.name, role: user.role } });
 });
 
-// 3. تسجيل موظف جديد
+// 3. Register
 app.post('/api/users/register', async (req, res) => {
   const { name, role, password } = req.body;
   if (!name || !password || password.length < 8) {
@@ -97,13 +97,13 @@ app.post('/api/users/register', async (req, res) => {
   res.json({ success: true, user: { id: newUser.id, name: newUser.name, role: newUser.role } });
 });
 
-// 4. جلب الطلبات
+// 4. Get Orders
 app.get('/api/data', async (req, res) => {
   const db = await loadDB();
   res.json({ orders: db.orders });
 });
 
-// 5. الإحصائيات
+// 5. Productivity Stats
 app.get('/api/stats', async (req, res) => {
   const db = await loadDB();
   const stats = {};
@@ -127,7 +127,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// 6. تحليل السكرين شوت عبر GitHub Models
+// 6. OCR using GitHub Models (GPT-4o)
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image provided' });
@@ -151,64 +151,37 @@ RULES:
 Output strictly:
 {"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
 
-    const modelsToTry = [
-      'openai/gpt-4o-mini',
-      'gpt-4o-mini',
-      'microsoft/Phi-3.5-vision-instruct'
-    ];
+    const response = await fetch('https://models.github.ai/inference/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token.trim()}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: dataUrl } }
+            ]
+          }
+        ],
+        temperature: 0.0,
+        response_format: { type: "json_object" }
+      })
+    });
 
-    let lastError = null;
-    let successfulData = null;
+    const data = await response.json();
 
-    for (const model of modelsToTry) {
-      try {
-        const response = await fetch('https://models.github.ai/inference/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token.trim()}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: model,
-            messages: [
-              {
-                role: 'user',
-                content: [
-                  { type: 'text', text: prompt },
-                  { type: 'image_url', image_url: { url: dataUrl } }
-                ]
-              }
-            ],
-            temperature: 0.0
-          })
-        });
-
-        const data = await response.json();
-
-        if (response.ok && data.choices?.[0]?.message?.content) {
-          successfulData = data;
-          lastError = null;
-          break;
-        } else {
-          lastError = data.error?.message || `Failed on ${model}`;
-        }
-      } catch (err) {
-        lastError = err.message;
-      }
+    if (!response.ok) {
+      console.error('GitHub Models API Error:', data);
+      return res.status(response.status).json({ error: data.error?.message || 'Error from GitHub Models service' });
     }
 
-    if (!successfulData) {
-      console.error('GitHub Models Error:', lastError);
-      return res.status(500).json({ error: 'GitHub Models Error: ' + lastError });
-    }
-
-    const rawContent = successfulData.choices[0].message.content || '{}';
-    const match = rawContent.match(/\{[\s\S]*?\}/);
-    if (!match) {
-      return res.status(500).json({ error: 'Could not parse JSON from output: ' + rawContent.slice(0, 100) });
-    }
-
-    const parsed = JSON.parse(match[0]);
+    const rawContent = data.choices?.[0]?.message?.content || '{}';
+    const parsed = JSON.parse(rawContent);
 
     if (parsed.qty) {
       const cleanQty = parseInt(String(parsed.qty).replace(/,/g, ''), 10);
@@ -227,7 +200,7 @@ Output strictly:
   }
 });
 
-// 7. إنشاء طلب جديد
+// 7. Create Order
 app.post('/api/orders', async (req, res) => {
   const db = await loadDB();
   const newOrder = {
@@ -249,7 +222,7 @@ app.post('/api/orders', async (req, res) => {
   res.json(newOrder);
 });
 
-// 8. حفظ التحجيم
+// 8. Complete Tahjeem
 app.patch('/api/orders/:id/tahjeem', async (req, res) => {
   const db = await loadDB();
   const order = db.orders.find(o => o.id === req.params.id);
@@ -266,7 +239,7 @@ app.patch('/api/orders/:id/tahjeem', async (req, res) => {
   res.json(order);
 });
 
-// 9. تنظيف الطلبات القديمة
+// 9. Clean Orders
 app.delete('/api/orders/clean', async (req, res) => {
   const days = parseInt(req.query.days) || 7;
   const db = await loadDB();
@@ -276,7 +249,7 @@ app.delete('/api/orders/clean', async (req, res) => {
   res.json({ success: true, count: db.orders.length });
 });
 
-// 10. تفريغ الأرشيف
+// 10. Clear All
 app.delete('/api/orders/clear-all', async (req, res) => {
   const db = await loadDB();
   db.orders = [];
