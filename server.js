@@ -12,7 +12,7 @@ app.use(cors());
 app.use(express.json({ limit: '25mb' }));
 app.use(express.static('public'));
 
-// --- الاتصال بقاعدة البيانات السحابية MongoDB Atlas ---
+// --- MongoDB Atlas Connection ---
 const MONGODB_URI = process.env.MONGODB_URI;
 
 const AppStateSchema = new mongoose.Schema({
@@ -30,11 +30,11 @@ if (MONGODB_URI) {
   mongoose.connect(MONGODB_URI)
     .then(async () => {
       isConnectedToMongo = true;
-      console.log('✅ Connected permanently to MongoDB Atlas');
+      console.log('✅ Connected to MongoDB Atlas');
       const doc = await AppState.findOne({ key: 'main_state' });
       if (!doc) await AppState.create({ key: 'main_state', users: [], orders: [] });
     })
-    .catch(err => console.error('⚠️ MongoDB error:', err.message));
+    .catch(err => console.error('MongoDB error:', err.message));
 }
 
 async function loadDB() {
@@ -64,7 +64,7 @@ async function saveDB(data) {
   }
 }
 
-// 1. جلب قائمة الموظفين
+// 1. قائمة الموظفين
 app.get('/api/users/list', async (req, res) => {
   const db = await loadDB();
   res.json((db.users || []).map(u => ({ id: u.id, name: u.name, role: u.role })));
@@ -81,7 +81,7 @@ app.post('/api/login', async (req, res) => {
   res.json({ success: true, user: { id: user.id, name: user.name, role: user.role } });
 });
 
-// 3. إنشاء حساب موظف جديد
+// 3. إنشاء حساب جديد
 app.post('/api/users/register', async (req, res) => {
   const { name, role, password } = req.body;
   if (!name || !password || password.length < 8) {
@@ -103,7 +103,7 @@ app.get('/api/data', async (req, res) => {
   res.json({ orders: db.orders });
 });
 
-// 5. إحصائيات إنتاجية الموظفين
+// 5. الإحصائيات
 app.get('/api/stats', async (req, res) => {
   const db = await loadDB();
   const stats = {};
@@ -127,13 +127,14 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// 6. قراءة السكرين شوت عبر GitHub Models باستخدام المفتاح ai_yahjeem
+// 6. OCR عبر GitHub Models بالرابط الرسمي
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image provided' });
 
+    // قراءة مفتاحك من Render
     const token = process.env.ai_yahjeem;
-    if (!token) return res.status(500).json({ error: 'ai_yahjeem is not defined in Render environment variables' });
+    if (!token) return res.status(500).json({ error: 'ai_yahjeem variable is missing in Render Environment' });
 
     const base64Data = req.file.buffer.toString('base64');
     const mimeType = req.file.mimetype || 'image/png';
@@ -151,7 +152,8 @@ RULES:
 Output strictly:
 {"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
 
-    const response = await fetch('https://models.inference.ai.azure.com/chat/completions', {
+    // عنوان GitHub Models الرسمي
+    const response = await fetch('https://models.github.ai/inference/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token.trim()}`,
@@ -176,7 +178,7 @@ Output strictly:
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('GitHub Models API Error:', data);
+      console.error('GitHub Models Error:', data);
       return res.status(response.status).json({ error: data.error?.message || 'Error from GitHub Models service' });
     }
 
@@ -227,7 +229,7 @@ app.post('/api/orders', async (req, res) => {
   res.json(newOrder);
 });
 
-// 8. حفظ واعتماد التحجيم
+// 8. حفظ التحجيم
 app.patch('/api/orders/:id/tahjeem', async (req, res) => {
   const db = await loadDB();
   const order = db.orders.find(o => o.id === req.params.id);
