@@ -184,79 +184,68 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// 6. تحليل السكرين شوت مع التخلص التام من ثرثرة التفكير (<think>)
+// 6. تحليل السكرين شوت عبر محرك OpenRouter (موديل الرؤية المجاني/السريع)
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No image uploaded' });
     }
 
-    const groqKey = process.env.GROQ_API_KEY;
-    if (!groqKey) {
-      return res.status(500).json({ error: 'GROQ_API_KEY is missing' });
+    const openRouterKey = process.env.OPENROUTER_API_KEY;
+    if (!openRouterKey) {
+      return res.status(500).json({ error: 'OPENROUTER_API_KEY is missing in Render environment variables' });
     }
 
     const base64Image = req.file.buffer.toString('base64');
     const mimeType = req.file.mimetype || 'image/png';
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
-    const prompt = `DO NOT THINK. DO NOT REASON. Output raw JSON directly without preamble or markdown.
-Extract Sage CRM fields:
-{"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}
-Rules:
-- Serial numbers contain DIGIT '0', not letter 'O'.
-- Qty must be whole integer.
-- Weight rounded UP to nearest 0.1 ton.
-- Accurate clearance company name and warehouse location code.`;
+    const prompt = `You are a precision OCR engine for Sage CRM logistics windows.
+Extract the text accurately into a strict JSON object with NO markdown formatting, NO backticks, and NO conversational text.
 
-    let response = null;
-    let data = null;
+RULES:
+1. '0' vs 'O': Serial numbers, ALV numbers, and B/L identifiers always contain DIGIT '0', NOT letter 'O'.
+2. QUANTITY (qty): Whole integer only (e.g. 55).
+3. WEIGHT (weight): Weight in tons rounded UP to nearest 0.1 ton (e.g. 1.611 becomes 1.7).
+4. LOCATION & CLEARANCE: Extract exact values from the table.
 
-    for (let attempt = 0; attempt < 2; attempt++) {
-      response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${groqKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'qwen/qwen3.6-27b',
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: prompt },
-                { type: 'image_url', image_url: { url: dataUrl } }
-              ]
-            }
-          ],
-          temperature: 0.0,
-          max_tokens: 2048
-        })
-      });
+Output JSON structure:
+{"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
 
-      data = await response.json();
-      if (response.ok) break;
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openRouterKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://tahjeem.onrender.com',
+        'X-Title': 'Tahjeem ALV'
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.0-flash-exp:free', // أفضل موديل رؤية مجاني وسريع على OpenRouter
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: dataUrl } }
+            ]
+          }
+        ],
+        temperature: 0.0
+      })
+    });
 
-      const errMsg = data.error?.message || '';
-      if (errMsg.includes('Rate limit') && attempt === 0) {
-        await new Promise(r => setTimeout(r, 6000));
-        continue;
-      } else {
-        return res.status(response.status).json({ error: errMsg || 'OCR request failed' });
-      }
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('OpenRouter Error:', data);
+      return res.status(response.status).json({ error: data.error?.message || 'Error from OpenRouter' });
     }
 
     let rawContent = data.choices?.[0]?.message?.content || '';
-
-    // إزالة وسوم التفكير نهائياً إذا قام النموذج بكتابتها
-    rawContent = rawContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-
-    // البحث عن أول كائن JSON صالح
     const match = rawContent.match(/\{[\s\S]*?\}/);
     if (!match) {
-      console.error('Raw content failed parse:', rawContent);
-      return res.status(500).json({ error: 'Failed to extract JSON. Content was: ' + rawContent.slice(0, 80) });
+      return res.status(500).json({ error: 'Could not extract JSON data from OpenRouter response' });
     }
 
     const parsed = JSON.parse(match[0]);
