@@ -12,7 +12,7 @@ app.use(cors());
 app.use(express.json({ limit: '25mb' }));
 app.use(express.static('public'));
 
-// --- MongoDB Atlas Connection ---
+// --- الاتصال بقاعدة البيانات السحابية MongoDB Atlas ---
 const MONGODB_URI = process.env.MONGODB_URI;
 
 const AppStateSchema = new mongoose.Schema({
@@ -30,11 +30,11 @@ if (MONGODB_URI) {
   mongoose.connect(MONGODB_URI)
     .then(async () => {
       isConnectedToMongo = true;
-      console.log('✅ Connected to MongoDB Atlas');
+      console.log('✅ Connected permanently to MongoDB Atlas');
       const doc = await AppState.findOne({ key: 'main_state' });
       if (!doc) await AppState.create({ key: 'main_state', users: [], orders: [] });
     })
-    .catch(err => console.error('MongoDB error:', err.message));
+    .catch(err => console.error('⚠️ MongoDB error:', err.message));
 }
 
 async function loadDB() {
@@ -64,13 +64,13 @@ async function saveDB(data) {
   }
 }
 
-// 1. Users List
+// 1. جلب قائمة الموظفين
 app.get('/api/users/list', async (req, res) => {
   const db = await loadDB();
   res.json((db.users || []).map(u => ({ id: u.id, name: u.name, role: u.role })));
 });
 
-// 2. Login
+// 2. تسجيل الدخول
 app.post('/api/login', async (req, res) => {
   const { userId, password } = req.body;
   const db = await loadDB();
@@ -81,7 +81,7 @@ app.post('/api/login', async (req, res) => {
   res.json({ success: true, user: { id: user.id, name: user.name, role: user.role } });
 });
 
-// 3. Register
+// 3. إنشاء حساب موظف جديد
 app.post('/api/users/register', async (req, res) => {
   const { name, role, password } = req.body;
   if (!name || !password || password.length < 8) {
@@ -97,13 +97,13 @@ app.post('/api/users/register', async (req, res) => {
   res.json({ success: true, user: { id: newUser.id, name: newUser.name, role: newUser.role } });
 });
 
-// 4. Get Orders
+// 4. جلب الطلبات
 app.get('/api/data', async (req, res) => {
   const db = await loadDB();
   res.json({ orders: db.orders });
 });
 
-// 5. Productivity Stats
+// 5. إحصائيات إنتاجية الموظفين
 app.get('/api/stats', async (req, res) => {
   const db = await loadDB();
   const stats = {};
@@ -127,12 +127,11 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// 6. OCR using GitHub Models with ai_yahjeem
+// 6. قراءة السكرين شوت عبر GitHub Models باستخدام المفتاح ai_yahjeem
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image provided' });
 
-    // قراءة المفتاح مباشرة من المتغير الموجود عندك
     const token = process.env.ai_yahjeem;
     if (!token) return res.status(500).json({ error: 'ai_yahjeem is not defined in Render environment variables' });
 
@@ -206,7 +205,7 @@ Output strictly:
   }
 });
 
-// 7. Create Order
+// 7. إنشاء طلب جديد
 app.post('/api/orders', async (req, res) => {
   const db = await loadDB();
   const newOrder = {
@@ -228,7 +227,7 @@ app.post('/api/orders', async (req, res) => {
   res.json(newOrder);
 });
 
-// 8. Complete Tahjeem
+// 8. حفظ واعتماد التحجيم
 app.patch('/api/orders/:id/tahjeem', async (req, res) => {
   const db = await loadDB();
   const order = db.orders.find(o => o.id === req.params.id);
@@ -245,7 +244,7 @@ app.patch('/api/orders/:id/tahjeem', async (req, res) => {
   res.json(order);
 });
 
-// 9. Clean Orders
+// 9. تنظيف الطلبات القديمة
 app.delete('/api/orders/clean', async (req, res) => {
   const days = parseInt(req.query.days) || 7;
   const db = await loadDB();
@@ -255,7 +254,7 @@ app.delete('/api/orders/clean', async (req, res) => {
   res.json({ success: true, count: db.orders.length });
 });
 
-// 10. Clear All
+// 10. تفريغ كامل الأرشيف
 app.delete('/api/orders/clear-all', async (req, res) => {
   const db = await loadDB();
   db.orders = [];
