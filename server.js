@@ -127,7 +127,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// 6. تحليل السكرين شوت عبر GitHub Models باستخدام gpt-4o-mini المعتمد
+// 6. تحليل السكرين شوت عبر GitHub Models
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image provided' });
@@ -151,36 +151,58 @@ RULES:
 Output strictly:
 {"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
 
-    const response = await fetch('https://models.github.ai/inference/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token.trim()}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: prompt },
-              { type: 'image_url', image_url: { url: dataUrl } }
-            ]
-          }
-        ],
-        temperature: 0.0,
-        response_format: { type: "json_object" }
-      })
-    });
+    const modelsToTry = [
+      'openai/gpt-4o-mini',
+      'gpt-4o-mini',
+      'microsoft/Phi-3.5-vision-instruct'
+    ];
 
-    const data = await response.json();
+    let lastError = null;
+    let successfulData = null;
 
-    if (!response.ok) {
-      console.error('GitHub Models Error:', data);
-      return res.status(response.status).json({ error: data.error?.message || 'Error from GitHub Models service' });
+    for (const model of modelsToTry) {
+      try {
+        const response = await fetch('https://models.github.ai/inference/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token.trim()}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  { type: 'text', text: prompt },
+                  { type: 'image_url', image_url: { url: dataUrl } }
+                ]
+              }
+            ],
+            temperature: 0.0
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.choices?.[0]?.message?.content) {
+          successfulData = data;
+          lastError = null;
+          break;
+        } else {
+          lastError = data.error?.message || `Failed on ${model}`;
+        }
+      } catch (err) {
+        lastError = err.message;
+      }
     }
 
-    const rawContent = data.choices?.[0]?.message?.content || '{}';
+    if (!successfulData) {
+      console.error('GitHub Models Error:', lastError);
+      return res.status(500).json({ error: 'GitHub Models Error: ' + lastError });
+    }
+
+    const rawContent = successfulData.choices[0].message.content || '{}';
     const match = rawContent.match(/\{[\s\S]*?\}/);
     if (!match) {
       return res.status(500).json({ error: 'Could not parse JSON from output: ' + rawContent.slice(0, 100) });
