@@ -9,10 +9,10 @@ const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
 app.use(cors());
-app.use(express.json({ limit: '15mb' }));
+app.use(express.json({ limit: '25mb' }));
 app.use(express.static('public'));
 
-// --- الاتصال بقاعدة البيانات السحابية MongoDB Atlas ---
+// --- MongoDB Atlas Connection ---
 const MONGODB_URI = process.env.MONGODB_URI;
 
 const AppStateSchema = new mongoose.Schema({
@@ -23,26 +23,18 @@ const AppStateSchema = new mongoose.Schema({
 
 const AppState = mongoose.model('AppState', AppStateSchema);
 
-let memoryState = {
-  users: [],
-  orders: []
-};
-
+let memoryState = { users: [], orders: [] };
 let isConnectedToMongo = false;
 
 if (MONGODB_URI) {
   mongoose.connect(MONGODB_URI)
     .then(async () => {
       isConnectedToMongo = true;
-      console.log('✅ Connected permanently to MongoDB Atlas');
+      console.log('✅ Connected to MongoDB Atlas');
       const doc = await AppState.findOne({ key: 'main_state' });
-      if (!doc) {
-        await AppState.create({ key: 'main_state', users: [], orders: [] });
-      }
+      if (!doc) await AppState.create({ key: 'main_state', users: [], orders: [] });
     })
-    .catch(err => {
-      console.error('⚠️ MongoDB connection error, running in memory mode:', err.message);
-    });
+    .catch(err => console.error('MongoDB error:', err.message));
 }
 
 async function loadDB() {
@@ -51,7 +43,7 @@ async function loadDB() {
       const doc = await AppState.findOne({ key: 'main_state' });
       if (doc) return { users: doc.users || [], orders: doc.orders || [] };
     } catch (err) {
-      console.error('Error loading from DB:', err);
+      console.error('Error loading DB:', err);
     }
   }
   return memoryState;
@@ -67,209 +59,132 @@ async function saveDB(data) {
         { upsert: true }
       );
     } catch (err) {
-      console.error('Error saving to DB:', err);
+      console.error('Error saving DB:', err);
     }
   }
 }
 
-// 1. جلب قائمة الموظفين
+// 1. Users List
 app.get('/api/users/list', async (req, res) => {
   const db = await loadDB();
-  const list = (db.users || []).map(u => ({
-    id: u.id,
-    name: u.name,
-    role: u.role
-  }));
-  res.json(list);
+  res.json((db.users || []).map(u => ({ id: u.id, name: u.name, role: u.role })));
 });
 
-// 2. تسجيل الدخول
+// 2. Login
 app.post('/api/login', async (req, res) => {
   const { userId, password } = req.body;
-  if (!userId || !password) {
-    return res.status(400).json({ error: 'Please select an employee and enter password' });
-  }
-
   const db = await loadDB();
   const user = db.users.find(u => u.id === userId);
-  if (!user) return res.status(404).json({ error: 'Employee not found' });
-
-  if (user.password !== password) {
-    return res.status(401).json({ error: 'Incorrect password' });
+  if (!user || user.password !== password) {
+    return res.status(401).json({ error: 'Invalid user or password' });
   }
-
-  res.json({
-    success: true,
-    user: { id: user.id, name: user.name, role: user.role }
-  });
+  res.json({ success: true, user: { id: user.id, name: user.name, role: user.role } });
 });
 
-// 3. إنشاء حساب موظف جديد
+// 3. Register
 app.post('/api/users/register', async (req, res) => {
   const { name, role, password } = req.body;
-  if (!name || !password) {
-    return res.status(400).json({ error: 'Name and password are required' });
-  }
-
-  if (password.length < 8) {
+  if (!name || !password || password.length < 8) {
     return res.status(400).json({ error: 'Password must be at least 8 characters' });
   }
-
   const db = await loadDB();
-  const cleanName = name.trim();
-  
-  if (db.users.some(u => u.name.toLowerCase() === cleanName.toLowerCase())) {
-    return res.status(400).json({ error: 'This employee name is already registered' });
+  if (db.users.some(u => u.name.toLowerCase() === name.trim().toLowerCase())) {
+    return res.status(400).json({ error: 'Employee already registered' });
   }
-
-  const newId = 'u_' + Date.now();
-  const newUser = {
-    id: newId,
-    name: cleanName,
-    role: role || 'cs',
-    password: password.trim()
-  };
-
+  const newUser = { id: 'u_' + Date.now(), name: name.trim(), role: role || 'cs', password: password.trim() };
   db.users.push(newUser);
   await saveDB(db);
-
-  res.json({
-    success: true,
-    user: { id: newUser.id, name: newUser.name, role: newUser.role }
-  });
+  res.json({ success: true, user: { id: newUser.id, name: newUser.name, role: newUser.role } });
 });
 
-// 4. جلب الطلبات
+// 4. Get Orders
 app.get('/api/data', async (req, res) => {
   const db = await loadDB();
   res.json({ orders: db.orders });
 });
 
-// 5. إحصائيات إنتاجية الموظفين
+// 5. Productivity Stats
 app.get('/api/stats', async (req, res) => {
   const db = await loadDB();
   const stats = {};
-
   (db.users || []).forEach(u => {
-    stats[u.name] = {
-      role: u.role === 'cs' ? 'Customer Service' : 'Warehouse',
-      totalBLs: 0,
-      totalCars: 0
-    };
+    stats[u.name] = { role: u.role === 'cs' ? 'Customer Service' : 'Warehouse', totalBLs: 0, totalCars: 0 };
   });
-
   (db.orders || []).forEach(order => {
     const blCount = (order.bls || []).length;
-    if (blCount === 0) return;
-
-    const creator = order.createdBy;
-    if (creator) {
-      if (!stats[creator]) {
-        stats[creator] = { role: 'Employee', totalBLs: 0, totalCars: 0 };
-      }
-      stats[creator].totalBLs += blCount;
-      stats[creator].totalCars += 1;
+    if (!blCount) return;
+    if (order.createdBy) {
+      if (!stats[order.createdBy]) stats[order.createdBy] = { role: 'CS', totalBLs: 0, totalCars: 0 };
+      stats[order.createdBy].totalBLs += blCount;
+      stats[order.createdBy].totalCars += 1;
     }
-
-    const measurer = order.measuredBy;
-    if (measurer && measurer !== creator && order.status === 'تم التحجيم') {
-      if (!stats[measurer]) {
-        stats[measurer] = { role: 'Warehouse', totalBLs: 0, totalCars: 0 };
-      }
-      stats[measurer].totalBLs += blCount;
-      stats[measurer].totalCars += 1;
+    if (order.measuredBy && order.measuredBy !== order.createdBy && order.status === 'تم التحجيم') {
+      if (!stats[order.measuredBy]) stats[order.measuredBy] = { role: 'Warehouse', totalBLs: 0, totalCars: 0 };
+      stats[order.measuredBy].totalBLs += blCount;
+      stats[order.measuredBy].totalCars += 1;
     }
   });
-
   res.json(stats);
 });
 
-// 6. تحليل السكرين شوت عبر OpenRouter مع موديلات مؤكدة الوجود ومستقرة
+// 6. OCR using GitHub Models with ai_yahjeem
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No image uploaded' });
-    }
+    if (!req.file) return res.status(400).json({ error: 'No image provided' });
 
-    const openRouterKey = process.env.OPENROUTER_API_KEY;
-    if (!openRouterKey) {
-      return res.status(500).json({ error: 'OPENROUTER_API_KEY is missing in Render variables' });
-    }
+    // قراءة المفتاح مباشرة من المتغير الموجود عندك
+    const token = process.env.ai_yahjeem;
+    if (!token) return res.status(500).json({ error: 'ai_yahjeem is not defined in Render environment variables' });
 
-    const base64Image = req.file.buffer.toString('base64');
+    const base64Data = req.file.buffer.toString('base64');
     const mimeType = req.file.mimetype || 'image/png';
-    const dataUrl = `data:${mimeType};base64,${base64Image}`;
+    const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
-    const prompt = `Logistics OCR for Sage CRM window.
-Extract the fields and return a single valid JSON object ONLY. No conversational text, no markdown.
+    const prompt = `Logistics OCR task for Sage CRM window.
+Extract the logistics values accurately. Respond ONLY with a valid JSON object. No intro, no reasoning, no markdown backticks.
 
 RULES:
-- '0' vs 'O': Serial numbers and B/L identifiers always contain DIGIT '0', NOT letter 'O'.
-- QUANTITY (qty): Whole integer only.
-- WEIGHT (weight): Weight in tons rounded UP to nearest 0.1 ton.
-- Accurate location code and clearance company.
+1. Alphanumerics: Serial numbers and B/L identifiers always contain the DIGIT '0', NOT letter 'O'.
+2. Quantity (qty): Extract as pure integer (e.g. 55).
+3. Weight: Rounded UP to the nearest 0.1 ton (e.g. 1.611 -> 1.7).
+4. Accurately transcribe clearance company name and warehouse location code.
 
-JSON Structure:
+Output strictly:
 {"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
 
-    // قائمة الموديلات البصرية المستقرة والمتاحة دائماً على OpenRouter
-    const modelsToTry = [
-      'google/gemini-2.0-flash-001',
-      'google/gemini-flash-1.5',
-      'meta-llama/llama-3.2-11b-vision-instruct'
-    ];
+    const response = await fetch('https://models.inference.ai.azure.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token.trim()}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'Llama-3.2-11B-Vision-Instruct',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: dataUrl } }
+            ]
+          }
+        ],
+        temperature: 0.0,
+        max_tokens: 1024
+      })
+    });
 
-    let lastError = null;
-    let successfulData = null;
+    const data = await response.json();
 
-    for (const model of modelsToTry) {
-      try {
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openRouterKey}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': 'https://tahjeem.onrender.com',
-            'X-Title': 'Tahjeem ALV'
-          },
-          body: JSON.stringify({
-            model: model,
-            messages: [
-              {
-                role: 'user',
-                content: [
-                  { type: 'text', text: prompt },
-                  { type: 'image_url', image_url: { url: dataUrl } }
-                ]
-              }
-            ],
-            temperature: 0.0
-          })
-        });
-
-        const data = await response.json();
-
-        if (response.ok && data.choices?.[0]?.message?.content) {
-          successfulData = data;
-          lastError = null;
-          break;
-        } else {
-          lastError = data.error?.message || `Failed on ${model}`;
-        }
-      } catch (err) {
-        lastError = err.message;
-      }
+    if (!response.ok) {
+      console.error('GitHub Models API Error:', data);
+      return res.status(response.status).json({ error: data.error?.message || 'Error from GitHub Models service' });
     }
 
-    if (!successfulData) {
-      console.error('OpenRouter Failed:', lastError);
-      return res.status(500).json({ error: 'OpenRouter OCR Error: ' + lastError });
-    }
-
-    let rawContent = successfulData.choices[0].message.content;
+    const rawContent = data.choices?.[0]?.message?.content || '{}';
     const match = rawContent.match(/\{[\s\S]*?\}/);
     if (!match) {
-      return res.status(500).json({ error: 'Could not extract valid JSON: ' + rawContent.slice(0, 100) });
+      return res.status(500).json({ error: 'Could not parse JSON from output: ' + rawContent.slice(0, 100) });
     }
 
     const parsed = JSON.parse(match[0]);
@@ -291,7 +206,7 @@ JSON Structure:
   }
 });
 
-// 7. إنشاء طلب جديد
+// 7. Create Order
 app.post('/api/orders', async (req, res) => {
   const db = await loadDB();
   const newOrder = {
@@ -313,7 +228,7 @@ app.post('/api/orders', async (req, res) => {
   res.json(newOrder);
 });
 
-// 8. حفظ واعتماد التحجيم
+// 8. Complete Tahjeem
 app.patch('/api/orders/:id/tahjeem', async (req, res) => {
   const db = await loadDB();
   const order = db.orders.find(o => o.id === req.params.id);
@@ -330,7 +245,7 @@ app.patch('/api/orders/:id/tahjeem', async (req, res) => {
   res.json(order);
 });
 
-// 9. تنظيف وحذف الطلبات القديمة
+// 9. Clean Orders
 app.delete('/api/orders/clean', async (req, res) => {
   const days = parseInt(req.query.days) || 7;
   const db = await loadDB();
@@ -340,12 +255,12 @@ app.delete('/api/orders/clean', async (req, res) => {
   res.json({ success: true, count: db.orders.length });
 });
 
-// 10. تفريغ كامل الأرشيف
+// 10. Clear All
 app.delete('/api/orders/clear-all', async (req, res) => {
   const db = await loadDB();
   db.orders = [];
   await saveDB(db);
-  res.json({ success: true, message: 'Archive cleared completely' });
+  res.json({ success: true, message: 'Archive cleared' });
 });
 
 const PORT = process.env.PORT || 10000;
