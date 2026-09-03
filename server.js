@@ -184,7 +184,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// 6. تحليل السكرين شوت عبر محرك OpenRouter
+// 6. تحليل السكرين شوت عبر OpenRouter بالموديلات النشطة مع الاحتياط
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -200,52 +200,72 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
     const mimeType = req.file.mimetype || 'image/png';
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
-    const prompt = `You are a precision OCR engine for Sage CRM logistics windows.
-Extract the fields and return a single valid JSON object ONLY. No conversational text or markdown codeblocks.
+    const prompt = `You are a precision OCR engine for logistics Sage CRM windows.
+Extract the values and return a valid JSON object ONLY. No conversational text or markdown blocks.
 
-RULES:
-1. '0' vs 'O': Serial numbers, ALV numbers, and B/L identifiers always contain DIGIT '0', NOT letter 'O'.
-2. QUANTITY (qty): Whole integer only (e.g. 55).
-3. WEIGHT (weight): Weight in tons rounded UP to nearest 0.1 ton (e.g. 1.611 becomes 1.7).
-4. LOCATION & CLEARANCE: Extract exact values from the table.
+Rules:
+1. Digits '0' not letter 'O'.
+2. QTY must be integer only (e.g. 55).
+3. Weight rounded UP to 0.1 ton (e.g. 1.611 becomes 1.7).
+4. Location code and Clearance company extracted accurately.
 
-Format:
+JSON Keys:
 {"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openRouterKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://tahjeem.onrender.com',
-        'X-Title': 'Tahjeem ALV'
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.0-flash-exp:free',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: prompt },
-              { type: 'image_url', image_url: { url: dataUrl } }
-            ]
-          }
-        ],
-        temperature: 0.0
-      })
-    });
+    const activeModels = [
+      'meta-llama/llama-3.2-11b-vision-instruct:free',
+      'qwen/qwen-2.5-vl-72b-instruct:free'
+    ];
 
-    const data = await response.json();
+    let lastError = null;
+    let data = null;
 
-    if (!response.ok) {
-      console.error('OpenRouter Error Response:', data);
-      return res.status(response.status).json({ error: data.error?.message || 'Error from OpenRouter' });
+    for (const model of activeModels) {
+      try {
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openRouterKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://tahjeem.onrender.com',
+            'X-Title': 'Tahjeem ALV'
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  { type: 'text', text: prompt },
+                  { type: 'image_url', image_url: { url: dataUrl } }
+                ]
+              }
+            ],
+            temperature: 0.0
+          })
+        });
+
+        data = await response.json();
+        if (response.ok) {
+          lastError = null;
+          break;
+        } else {
+          lastError = data.error?.message || 'OpenRouter model unavailable';
+        }
+      } catch (err) {
+        lastError = err.message;
+      }
+    }
+
+    if (lastError) {
+      console.error('OpenRouter Error:', lastError);
+      return res.status(500).json({ error: lastError });
     }
 
     let rawContent = data.choices?.[0]?.message?.content || '';
     const match = rawContent.match(/\{[\s\S]*?\}/);
     if (!match) {
-      return res.status(500).json({ error: 'Could not extract JSON data from OpenRouter' });
+      return res.status(500).json({ error: 'Could not extract JSON data from OpenRouter response' });
     }
 
     const parsed = JSON.parse(match[0]);
