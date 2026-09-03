@@ -184,7 +184,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// 6. تحليل السكرين شوت عبر محرك OpenRouter (موديل الرؤية المجاني/السريع)
+// 6. تحليل السكرين شوت عبر محرك OpenRouter
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -193,7 +193,7 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
 
     const openRouterKey = process.env.OPENROUTER_API_KEY;
     if (!openRouterKey) {
-      return res.status(500).json({ error: 'OPENROUTER_API_KEY is missing in Render environment variables' });
+      return res.status(500).json({ error: 'OPENROUTER_API_KEY is missing in Render variables' });
     }
 
     const base64Image = req.file.buffer.toString('base64');
@@ -201,7 +201,7 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
     const prompt = `You are a precision OCR engine for Sage CRM logistics windows.
-Extract the text accurately into a strict JSON object with NO markdown formatting, NO backticks, and NO conversational text.
+Extract the fields and return a single valid JSON object ONLY. No conversational text or markdown codeblocks.
 
 RULES:
 1. '0' vs 'O': Serial numbers, ALV numbers, and B/L identifiers always contain DIGIT '0', NOT letter 'O'.
@@ -209,7 +209,7 @@ RULES:
 3. WEIGHT (weight): Weight in tons rounded UP to nearest 0.1 ton (e.g. 1.611 becomes 1.7).
 4. LOCATION & CLEARANCE: Extract exact values from the table.
 
-Output JSON structure:
+Format:
 {"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -221,7 +221,7 @@ Output JSON structure:
         'X-Title': 'Tahjeem ALV'
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.0-flash-exp:free', // أفضل موديل رؤية مجاني وسريع على OpenRouter
+        model: 'google/gemini-2.0-flash-exp:free',
         messages: [
           {
             role: 'user',
@@ -238,14 +238,14 @@ Output JSON structure:
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('OpenRouter Error:', data);
+      console.error('OpenRouter Error Response:', data);
       return res.status(response.status).json({ error: data.error?.message || 'Error from OpenRouter' });
     }
 
     let rawContent = data.choices?.[0]?.message?.content || '';
     const match = rawContent.match(/\{[\s\S]*?\}/);
     if (!match) {
-      return res.status(500).json({ error: 'Could not extract JSON data from OpenRouter response' });
+      return res.status(500).json({ error: 'Could not extract JSON data from OpenRouter' });
     }
 
     const parsed = JSON.parse(match[0]);
