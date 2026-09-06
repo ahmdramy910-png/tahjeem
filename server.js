@@ -29,12 +29,10 @@ const AppStateSchema = new mongoose.Schema(
       default: 'main_state',
       unique: true
     },
-
     users: {
       type: Array,
       default: []
     },
-
     orders: {
       type: Array,
       default: []
@@ -59,7 +57,7 @@ let isConnectedToMongo = false;
 
 
 /* =========================
-   MONGODB CONNECTION
+   MONGODB
    ========================= */
 
 if (MONGODB_URI) {
@@ -93,17 +91,12 @@ if (MONGODB_URI) {
 }
 
 
-/* =========================
-   DATABASE FUNCTIONS
-   ========================= */
-
 async function loadDB() {
   if (isConnectedToMongo) {
     try {
-      const doc =
-        await AppState.findOne({
-          key: 'main_state'
-        });
+      const doc = await AppState.findOne({
+        key: 'main_state'
+      });
 
       if (doc) {
         return {
@@ -196,7 +189,6 @@ app.post(
 
     res.json({
       success: true,
-
       user: {
         id: user.id,
         name: user.name,
@@ -233,9 +225,7 @@ app.post(
       db.users.some(
         u =>
           u.name.toLowerCase() ===
-          name
-            .trim()
-            .toLowerCase()
+          name.trim().toLowerCase()
       )
     ) {
       return res.status(400).json({
@@ -245,18 +235,10 @@ app.post(
     }
 
     const newUser = {
-      id:
-        'u_' +
-        Date.now(),
-
-      name:
-        name.trim(),
-
-      role:
-        role || 'cs',
-
-      password:
-        password.trim()
+      id: 'u_' + Date.now(),
+      name: name.trim(),
+      role: role || 'cs',
+      password: password.trim()
     };
 
     db.users.push(newUser);
@@ -265,7 +247,6 @@ app.post(
 
     res.json({
       success: true,
-
       user: {
         id: newUser.id,
         name: newUser.name,
@@ -303,86 +284,65 @@ app.get(
 
     const stats = {};
 
-    (db.users || []).forEach(
-      u => {
-        stats[u.name] = {
-          role:
-            u.role === 'cs'
-              ? 'Customer Service'
-              : 'Warehouse',
+    (db.users || []).forEach(u => {
+      stats[u.name] = {
+        role:
+          u.role === 'cs'
+            ? 'Customer Service'
+            : 'Warehouse',
+        totalBLs: 0,
+        totalCars: 0
+      };
+    });
 
-          totalBLs: 0,
+    (db.orders || []).forEach(order => {
+      const blCount =
+        (order.bls || []).length;
 
-          totalCars: 0
-        };
+      if (!blCount) {
+        return;
       }
-    );
 
-    (db.orders || []).forEach(
-      order => {
-        const blCount =
-          (order.bls || []).length;
-
-        if (!blCount) {
-          return;
+      if (order.createdBy) {
+        if (!stats[order.createdBy]) {
+          stats[order.createdBy] = {
+            role: 'CS',
+            totalBLs: 0,
+            totalCars: 0
+          };
         }
 
-        if (order.createdBy) {
-          if (
-            !stats[
-              order.createdBy
-            ]
-          ) {
-            stats[
-              order.createdBy
-            ] = {
-              role: 'CS',
-              totalBLs: 0,
-              totalCars: 0
-            };
-          }
+        stats[
+          order.createdBy
+        ].totalBLs += blCount;
 
-          stats[
-            order.createdBy
-          ].totalBLs += blCount;
-
-          stats[
-            order.createdBy
-          ].totalCars += 1;
-        }
-
-        if (
-          order.measuredBy &&
-          order.measuredBy !==
-            order.createdBy &&
-          order.status ===
-            'تم التحجيم'
-        ) {
-          if (
-            !stats[
-              order.measuredBy
-            ]
-          ) {
-            stats[
-              order.measuredBy
-            ] = {
-              role:
-                'Warehouse',
-              totalBLs: 0,
-              totalCars: 0
-            };
-          }
-
-          stats[
-            order.measuredBy
-          ].totalBLs += blCount;
-
-          stats[
-            order.measuredBy
-          ].totalCars += 1;
-        }
+        stats[
+          order.createdBy
+        ].totalCars += 1;
       }
-    );
+
+      if (
+        order.measuredBy &&
+        order.measuredBy !== order.createdBy &&
+        order.status === 'تم التحجيم'
+      ) {
+        if (!stats[order.measuredBy]) {
+          stats[order.measuredBy] = {
+            role: 'Warehouse',
+            totalBLs: 0,
+            totalCars: 0
+          };
+        }
+
+        stats[
+          order.measuredBy
+        ].totalBLs += blCount;
+
+        stats[
+          order.measuredBy
+        ].totalCars += 1;
+      }
+    });
 
     res.json(stats);
   }
@@ -400,15 +360,12 @@ app.post(
     try {
       if (!req.file) {
         return res.status(400).json({
-          error:
-            'No image provided'
+          error: 'No image provided'
         });
       }
 
       const base64Data =
-        req.file.buffer.toString(
-          'base64'
-        );
+        req.file.buffer.toString('base64');
 
       const prompt = `
 You are a highly accurate OCR system for a logistics company.
@@ -433,7 +390,7 @@ Do not write explanations.
 Do not use markdown.
 Do not add extra fields.
 
-OCR RULES:
+IMPORTANT RULES:
 
 1. B/L NUMBER
 Read the B/L number exactly as shown.
@@ -483,94 +440,126 @@ Transcribe the clearance company name accurately.
 8. DO NOT GUESS
 If a field cannot be read clearly, return an empty string.
 
-9. PRESERVE VALUES
-Do not invent, change, or normalize values unless the rules above specifically require it.
+9. DO NOT INVENT DATA
+Never create information that is not visible in the image.
+
+10. PRESERVE ORIGINAL VALUES
+Keep the original value whenever possible.
 
 Return ONLY the JSON object.
 `;
 
-
-      /* =========================
-         OLLAMA CONNECTION
-         ========================= */
-
       const ollamaUrl =
-        'https://textiles-cholesterol-collection-competitive.trycloudflare.com/api/chat';
+        'https://requirements-thy-aspects-guns.trycloudflare.com/api/chat';
 
+      const response = await fetch(
+        ollamaUrl,
+        {
+          method: 'POST',
 
-      const response =
-        await fetch(
-          ollamaUrl,
-          {
-            method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json'
+          },
 
-            headers: {
-              'Content-Type':
-                'application/json'
-            },
+          body: JSON.stringify({
+            model: 'qwen2.5vl:7b',
 
-            body: JSON.stringify({
-              model:
-                'qwen2.5vl:7b',
-
-              messages: [
-                {
-                  role: 'user',
-
-                  content:
-                    prompt,
-
-                  images: [
-                    base64Data
-                  ]
-                }
-              ],
-
-              stream: false,
-
-              format: 'json',
-
-              options: {
-                temperature: 0
+            messages: [
+              {
+                role: 'user',
+                content: prompt,
+                images: [base64Data]
               }
-            })
-          }
-        );
+            ],
+
+            stream: false,
+
+            format: 'json',
+
+            options: {
+              temperature: 0
+            }
+          })
+        }
+      );
 
 
-      const data =
-        await response.json();
+      const responseText =
+        await response.text();
 
 
       if (!response.ok) {
         console.error(
-          'Ollama Error:',
-          data
+          'Ollama HTTP Error:',
+          response.status,
+          responseText
         );
 
         return res.status(500).json({
           error:
-            data.error ||
-            'Ollama OCR service error'
+            'Ollama HTTP Error ' +
+            response.status +
+            ': ' +
+            responseText
+        });
+      }
+
+
+      if (!responseText.trim()) {
+        console.error(
+          'Ollama returned an empty response'
+        );
+
+        return res.status(500).json({
+          error:
+            'Ollama returned an empty response'
+        });
+      }
+
+
+      let data;
+
+      try {
+        data =
+          JSON.parse(responseText);
+      } catch (err) {
+        console.error(
+          'Invalid Ollama response:',
+          responseText
+        );
+
+        return res.status(500).json({
+          error:
+            'Invalid response from Ollama'
         });
       }
 
 
       const rawContent =
-        data.message?.content ||
-        '{}';
+        data.message?.content || '';
+
+
+      if (!rawContent.trim()) {
+        console.error(
+          'Ollama returned empty message content'
+        );
+
+        return res.status(500).json({
+          error:
+            'Ollama returned empty OCR result'
+        });
+      }
 
 
       let parsed;
 
       try {
         parsed =
-          JSON.parse(
-            rawContent
-          );
-      } catch (parseError) {
+          JSON.parse(rawContent);
+      } catch (err) {
         console.error(
-          'Invalid JSON returned by Ollama:',
+          'Invalid OCR JSON:',
           rawContent
         );
 
@@ -584,59 +573,49 @@ Return ONLY the JSON object.
       const result = {
         blNumber:
           String(
-            parsed.blNumber ||
-              ''
+            parsed.blNumber || ''
           ).trim(),
 
         alvSerial:
           String(
-            parsed.alvSerial ||
-              ''
+            parsed.alvSerial || ''
           ).trim(),
 
         qty:
           String(
-            parsed.qty ||
-              ''
+            parsed.qty || ''
           ).trim(),
 
         weight:
           String(
-            parsed.weight ||
-              ''
+            parsed.weight || ''
           ).trim(),
 
         pallets:
           String(
-            parsed.pallets ||
-              ''
+            parsed.pallets || ''
           ).trim(),
 
         location:
           String(
-            parsed.location ||
-              ''
+            parsed.location || ''
           ).trim(),
 
         clearanceCompany:
           String(
-            parsed.clearanceCompany ||
-              ''
+            parsed.clearanceCompany || ''
           ).trim()
       };
 
 
       /* =========================
-         QTY CLEANING
+         CLEAN QTY
          ========================= */
 
       if (result.qty) {
         const cleanQty =
           parseInt(
-            result.qty.replace(
-              /,/g,
-              ''
-            ),
+            result.qty.replace(/,/g, ''),
             10
           );
 
@@ -648,35 +627,24 @@ Return ONLY the JSON object.
 
 
       /* =========================
-         PALLETS CLEANING
+         CLEAN PALLETS
          ========================= */
 
       if (result.pallets) {
         const cleanPallets =
           parseInt(
-            result.pallets.replace(
-              /,/g,
-              ''
-            ),
+            result.pallets.replace(/,/g, ''),
             10
           );
 
-        if (
-          !isNaN(
-            cleanPallets
-          )
-        ) {
+        if (!isNaN(cleanPallets)) {
           result.pallets =
-            String(
-              cleanPallets
-            );
+            String(cleanPallets);
         }
       }
 
 
-      return res.json(
-        result
-      );
+      return res.json(result);
 
     } catch (err) {
       console.error(
@@ -708,8 +676,7 @@ app.post(
         'ORD-' +
         Math.floor(
           100000 +
-            Math.random() *
-              900000
+          Math.random() * 900000
         ),
 
       createdAt:
@@ -731,8 +698,7 @@ app.post(
         req.body.bls || [],
 
       totalWeight:
-        req.body.totalWeight ||
-        0,
+        req.body.totalWeight || 0,
 
       measurements: {
         length: '',
@@ -743,8 +709,7 @@ app.post(
       vehicleType: '',
 
       shareefNotes:
-        req.body.shareefNotes ||
-        '',
+        req.body.shareefNotes || '',
 
       measuredBy:
         null,
@@ -755,21 +720,17 @@ app.post(
           : null
     };
 
-    db.orders.unshift(
-      newOrder
-    );
+    db.orders.unshift(newOrder);
 
     await saveDB(db);
 
-    res.json(
-      newOrder
-    );
+    res.json(newOrder);
   }
 );
 
 
 /* =========================
-   TAHJEEM ORDER
+   TAHJEEM
    ========================= */
 
 app.patch(
@@ -779,9 +740,7 @@ app.patch(
 
     const order =
       db.orders.find(
-        o =>
-          o.id ===
-          req.params.id
+        o => o.id === req.params.id
       );
 
     if (!order) {
@@ -795,12 +754,10 @@ app.patch(
       req.body.measurements;
 
     order.vehicleType =
-      req.body.vehicleType ||
-      '';
+      req.body.vehicleType || '';
 
     order.shareefNotes =
-      req.body.shareefNotes ||
-      '';
+      req.body.shareefNotes || '';
 
     order.measuredBy =
       req.body.measuredBy ||
@@ -827,29 +784,25 @@ app.delete(
   '/api/orders/clean',
   async (req, res) => {
     const days =
-      parseInt(
-        req.query.days
-      ) || 7;
+      parseInt(req.query.days) || 7;
 
-    const db =
-      await loadDB();
+    const db = await loadDB();
 
     const cutoff =
       new Date(
         Date.now() -
-          days *
-            24 *
-            60 *
-            60 *
-            1000
+        days *
+        24 *
+        60 *
+        60 *
+        1000
       );
 
     db.orders =
       db.orders.filter(
         o =>
-          new Date(
-            o.createdAt
-          ) >= cutoff
+          new Date(o.createdAt) >=
+          cutoff
       );
 
     await saveDB(db);
@@ -870,8 +823,7 @@ app.delete(
 app.delete(
   '/api/orders/clear-all',
   async (req, res) => {
-    const db =
-      await loadDB();
+    const db = await loadDB();
 
     db.orders = [];
 
@@ -891,8 +843,7 @@ app.delete(
    ========================= */
 
 const PORT =
-  process.env.PORT ||
-  10000;
+  process.env.PORT || 10000;
 
 app.listen(
   PORT,
