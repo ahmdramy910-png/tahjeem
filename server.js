@@ -489,13 +489,14 @@ Do not invent, change, or normalize values unless the rules above specifically r
 Return ONLY the JSON object.
 `;
 
-      /*
-       * Ollama is running on the user's computer
-       * and is exposed through the Cloudflare tunnel.
-       */
+
+      /* =========================
+         OLLAMA CONNECTION
+         ========================= */
 
       const ollamaUrl =
-        'https://laboratories-spirituality-combo-smooth.trycloudflare.com/api/chat';
+        'https://textiles-cholesterol-collection-competitive.trycloudflare.com/api/chat';
+
 
       const response =
         await fetch(
@@ -536,8 +537,10 @@ Return ONLY the JSON object.
           }
         );
 
+
       const data =
         await response.json();
+
 
       if (!response.ok) {
         console.error(
@@ -552,9 +555,11 @@ Return ONLY the JSON object.
         });
       }
 
+
       const rawContent =
         data.message?.content ||
         '{}';
+
 
       let parsed;
 
@@ -574,6 +579,7 @@ Return ONLY the JSON object.
             'OCR returned invalid JSON'
         });
       }
+
 
       const result = {
         blNumber:
@@ -668,7 +674,9 @@ Return ONLY the JSON object.
       }
 
 
-      return res.json(result);
+      return res.json(
+        result
+      );
 
     } catch (err) {
       console.error(
