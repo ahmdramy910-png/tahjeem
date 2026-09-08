@@ -1,295 +1,263 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const ExcelJS = require('exceljs');
+const multer = require('multer');
+const mongoose = require('mongoose');
 const OpenAI = require('openai');
 require('dotenv').config();
 
 const app = express();
+const upload = multer({ storage: multer.memoryStorage() });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const JWT_SECRET = process.env.JWT_SECRET || 'tahjeem_secure_jwt_secret_key_2026';
 
-// Middlewares
 app.use(cors());
 app.use(express.json({ limit: '25mb' }));
 app.use(express.static('public'));
 
-// الاتصال بقاعدة بيانات MongoDB Atlas
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB Atlas'))
-  .catch(err => console.error('MongoDB Connection Error:', err));
+const MONGODB_URI = process.env.MONGODB_URI;
 
-// 1. هياكل البيانات (Mongoose Schemas)
+const AppStateSchema = new mongoose.Schema({
+  key: { type: String, default: 'main_state', unique: true },
+  users: { type: Array, default: [] },
+  orders: { type: Array, default: [] }
+}, { timestamps: true });
 
-// هيكل المستخدمين وإدارة الأدوار
-const UserSchema = new mongoose.Schema({
-  username: { type: String, required: true, unique: true, trim: true },
-  password: { type: String, required: true },
-  role: { type: String, enum: ['Admin', 'CustomerService', 'Warehouse'], default: 'Warehouse' },
-  fullName: String,
-  createdAt: { type: Date, default: Date.now }
+const AppState = mongoose.model('AppState', AppStateSchema);
+
+let memoryState = { users: [], orders: [] };
+let isConnectedToMongo = false;
+
+if (MONGODB_URI) {
+  mongoose.connect(MONGODB_URI)
+    .then(async () => {
+      isConnectedToMongo = true;
+      console.log('✅ Connected to MongoDB Atlas');
+      const doc = await AppState.findOne({ key: 'main_state' });
+      if (!doc) await AppState.create({ key: 'main_state', users: [], orders: [] });
+    })
+    .catch(err => console.error('MongoDB error:', err.message));
+}
+
+async function loadDB() {
+  if (isConnectedToMongo) {
+    try {
+      const doc = await AppState.findOne({ key: 'main_state' });
+      if (doc) return { users: doc.users || [], orders: doc.orders || [] };
+    } catch (err) {
+      console.error('Error loading DB:', err);
+    }
+  }
+  return memoryState;
+}
+
+async function saveDB(data) {
+  memoryState = data;
+  if (isConnectedToMongo) {
+    try {
+      await AppState.findOneAndUpdate(
+        { key: 'main_state' },
+        { users: data.users, orders: data.orders },
+        { upsert: true }
+      );
+    } catch (err) {
+      console.error('Error saving DB:', err);
+    }
+  }
+}
+
+// المستخدمين وتسجيل الدخول
+app.get('/api/users/list', async (req, res) => {
+  const db = await loadDB();
+  res.json((db.users || []).map(u => ({ id: u.id, name: u.name, role: u.role })));
 });
 
-// هيكل سجل التحجيم والشحنات
-const ShipmentSchema = new mongoose.Schema({
-  blNumber: { type: String, required: true, trim: true },
-  voyageNumber: { type: String, trim: true },
-  consignee: { type: String, trim: true },
-  cargoDimensions: [{
-    length: Number,
-    width: Number,
-    height: Number,
-    pieces: { type: Number, default: 1 },
-    cbm: Number
-  }],
-  totalCBM: { type: Number, required: true },
-  totalPieces: { type: Number, default: 0 },
-  extractedFromOCR: { type: Boolean, default: false },
-  createdBy: { type: String, default: 'Warehouse User' },
-  createdAt: { type: Date, default: Date.now }
+app.post('/api/login', async (req, res) => {
+  const { userId, password } = req.body;
+  const db = await loadDB();
+  const user = db.users.find(u => u.id === userId);
+  if (!user || user.password !== password) {
+    return res.status(401).json({ error: 'Invalid user or password' });
+  }
+  res.json({ success: true, user: { id: user.id, name: user.name, role: user.role } });
 });
 
-const User = mongoose.model('User', UserSchema);
-const Shipment = mongoose.model('Shipment', ShipmentSchema);
+app.post('/api/users/register', async (req, res) => {
+  const { name, role, password } = req.body;
+  if (!name || !password || password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+  const db = await loadDB();
+  if (db.users.some(u => u.name.toLowerCase() === name.trim().toLowerCase())) {
+    return res.status(400).json({ error: 'Employee already registered' });
+  }
+  const newUser = { id: 'u_' + Date.now(), name: name.trim(), role: role || 'cs', password: password.trim() };
+  db.users.push(newUser);
+  await saveDB(db);
+  res.json({ success: true, user: { id: newUser.id, name: newUser.name, role: newUser.role } });
+});
 
-// 2. التحقق من التوكن وصلاحيات المستخدم (Auth Middleware)
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ success: false, message: 'مطلوب تسجيل الدخول' });
+app.get('/api/data', async (req, res) => {
+  const db = await loadDB();
+  res.json({ orders: db.orders });
+});
 
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ success: false, message: 'جلسة الدخول غير صالحة' });
-    req.user = user;
-    next();
+// مؤشرات الأداء والإنتاجية
+app.get('/api/stats', async (req, res) => {
+  const db = await loadDB();
+  const stats = {};
+  (db.users || []).forEach(u => {
+    stats[u.name] = { role: u.role === 'cs' ? 'Customer Service' : 'Warehouse', totalBLs: 0, totalCars: 0 };
   });
-};
-
-// 3. مسارات المصادقة وتسجيل الدخول
-app.post('/api/auth/register', async (req, res) => {
-  try {
-    const { username, password, role, fullName } = req.body;
-    const existing = await User.findOne({ username });
-    if (existing) return res.status(400).json({ success: false, message: 'اسم المستخدم مسجل مسبقاً' });
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = new User({ username, password: hashedPassword, role, fullName });
-    await user.save();
-    res.status(201).json({ success: true, message: 'تم إنشاء الحساب بنجاح' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
+  (db.orders || []).forEach(order => {
+    const blCount = (order.bls || []).length;
+    if (!blCount) return;
+    if (order.createdBy) {
+      if (!stats[order.createdBy]) stats[order.createdBy] = { role: 'CS', totalBLs: 0, totalCars: 0 };
+      stats[order.createdBy].totalBLs += blCount;
+      stats[order.createdBy].totalCars += 1;
+    }
+    if (order.measuredBy && order.measuredBy !== order.createdBy && order.status === 'تم التحجيم') {
+      if (!stats[order.measuredBy]) stats[order.measuredBy] = { role: 'Warehouse', totalBLs: 0, totalCars: 0 };
+      stats[order.measuredBy].totalBLs += blCount;
+      stats[order.measuredBy].totalCars += 1;
+    }
+  });
+  res.json(stats);
 });
 
-app.post('/api/auth/login', async (req, res) => {
+// محرك OCR بدقة Structured Outputs عبر gpt-4o-mini
+app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
-    const { username, password } = req.body;
-    const user = await User.findOne({ username });
-    if (!user) return res.status(400).json({ success: false, message: 'بيانات الدخول غير صحيحة' });
+    if (!req.file) return res.status(400).json({ error: 'No image provided' });
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ success: false, message: 'بيانات الدخول غير صحيحة' });
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({ error: 'OPENAI_API_KEY variable is missing in Render Environment' });
+    }
 
-    const token = jwt.sign({ id: user._id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '12h' });
-    res.json({ success: true, token, user: { username: user.username, role: user.role, fullName: user.fullName } });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+    const base64Data = req.file.buffer.toString('base64');
+    const mimeType = req.file.mimetype || 'image/png';
+    const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
-// 4. نقطة فحص OCR واستخراج بيانات شاشات Sage CRM عبر gpt-4o-mini
-app.post('/api/ocr-extract', async (req, res) => {
-  const { imageBase64 } = req.body;
-  if (!imageBase64) return res.status(400).json({ success: false, message: 'الصورة مطلوبة (Base64)' });
+    const prompt = `Logistics OCR task for Sage CRM window.
+Extract the logistics values accurately.
+RULES:
+1. Alphanumerics: Serial numbers and B/L identifiers always contain the DIGIT '0', NOT letter 'O'.
+2. Quantity (qty): Extract as pure integer string (e.g. "55").
+3. Weight: Rounded UP to the nearest 0.1 ton (e.g. 1.611 -> "1.7").
+4. Accurately transcribe clearance company name and warehouse location code.
+If any field is missing from the image, set it to an empty string "".`;
 
-  try {
-    const imageUrl = imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`;
-
-    const response = await openai.chat.completions.create({
+    const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: "You are an expert OCR system specialized in extracting shipping logistics data from Sage CRM screenshots. Extract the B/L number, Voyage number, Consignee name, and Package Count accurately. Set missing text fields to empty strings and numeric fields to 0."
+          content: "You are an expert OCR assistant for logistics screens. Output must strictly adhere to the JSON schema."
         },
         {
           role: "user",
           content: [
-            { type: "text", text: "Extract B/L number, Voyage, Consignee, and Package count accurately from this Sage CRM screenshot." },
-            { type: "image_url", image_url: { url: imageUrl, detail: "high" } }
+            { type: "text", text: prompt },
+            { type: "image_url", image_url: { url: dataUrl, detail: "high" } }
           ]
         }
       ],
       response_format: {
         type: "json_schema",
         json_schema: {
-          name: "sage_crm_extraction",
+          name: "sage_crm_fields",
           strict: true,
           schema: {
             type: "object",
             properties: {
-              blNumber: { type: "string", description: "The Bill of Lading (B/L) number" },
-              voyageNumber: { type: "string", description: "The Voyage number or vessel ID" },
-              consignee: { type: "string", description: "The consignee or client company name" },
-              packageCount: { type: "number", description: "Total number of packages or pieces" }
+              blNumber: { type: "string", description: "B/L identifier" },
+              alvSerial: { type: "string", description: "ALV Serial number" },
+              qty: { type: "string", description: "Quantity of packages as a string" },
+              weight: { type: "string", description: "Weight rounded up to 0.1 ton as a string" },
+              pallets: { type: "string", description: "Number of pallets" },
+              location: { type: "string", description: "Warehouse location code" },
+              clearanceCompany: { type: "string", description: "Clearance company name" }
             },
-            required: ["blNumber", "voyageNumber", "consignee", "packageCount"],
+            required: ["blNumber", "alvSerial", "qty", "weight", "pallets", "location", "clearanceCompany"],
             additionalProperties: false
           }
         }
-      }
+      },
+      temperature: 0.0
     });
 
-    const extractedData = JSON.parse(response.choices[0].message.content);
-    res.json({ success: true, data: extractedData });
-  } catch (error) {
-    console.error('OCR Error:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+    const parsed = JSON.parse(completion.choices[0].message.content);
 
-// 5. مسارات التحجيم والشحنات
-app.post('/api/shipments', async (req, res) => {
-  try {
-    const { blNumber, voyageNumber, consignee, cargoDimensions, extractedFromOCR, createdBy } = req.body;
-
-    if (!blNumber) return res.status(400).json({ success: false, message: 'رقم البوليصة مطلوب' });
-
-    let calculatedTotalCBM = 0;
-    let calculatedTotalPieces = 0;
-
-    const dimensions = (cargoDimensions || []).map(dim => {
-      const l = Number(dim.length) || 0;
-      const w = Number(dim.width) || 0;
-      const h = Number(dim.height) || 0;
-      const pieces = Number(dim.pieces) || 1;
-      const cbm = parseFloat(((l * w * h / 1000000) * pieces).toFixed(3));
-
-      calculatedTotalCBM += cbm;
-      calculatedTotalPieces += pieces;
-
-      return { length: l, width: w, height: h, pieces, cbm };
-    });
-
-    const newShipment = new Shipment({
-      blNumber,
-      voyageNumber,
-      consignee,
-      cargoDimensions: dimensions,
-      totalCBM: parseFloat(calculatedTotalCBM.toFixed(3)),
-      totalPieces: calculatedTotalPieces,
-      extractedFromOCR: !!extractedFromOCR,
-      createdBy: createdBy || 'Warehouse User'
-    });
-
-    await newShipment.save();
-    res.status(201).json({ success: true, data: newShipment });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.get('/api/shipments', async (req, res) => {
-  try {
-    const { blNumber, voyageNumber, startDate, endDate } = req.query;
-    let filter = {};
-
-    if (blNumber) filter.blNumber = { $regex: blNumber, $options: 'i' };
-    if (voyageNumber) filter.voyageNumber = { $regex: voyageNumber, $options: 'i' };
-    if (startDate || endDate) {
-      filter.createdAt = {};
-      if (startDate) filter.createdAt.$gte = new Date(startDate);
-      if (endDate) filter.createdAt.$lte = new Date(endDate);
+    // تنظيف الأرقام الإضافي لضمان الدقة
+    if (parsed.qty) {
+      const cleanQty = parseInt(String(parsed.qty).replace(/,/g, ''), 10);
+      parsed.qty = isNaN(cleanQty) ? parsed.qty : String(cleanQty);
+    }
+    if (parsed.pallets) {
+      const cleanPallets = parseInt(String(parsed.pallets).replace(/,/g, ''), 10);
+      parsed.pallets = isNaN(cleanPallets) ? parsed.pallets : String(cleanPallets);
     }
 
-    const shipments = await Shipment.find(filter).sort({ createdAt: -1 });
-    res.json({ success: true, count: shipments.length, data: shipments });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return res.json(parsed);
+
+  } catch (err) {
+    console.error('OCR Endpoint Error:', err);
+    return res.status(500).json({ error: 'Server Error: ' + err.message });
   }
 });
 
-// 6. مسار تصدير السجلات إلى Excel
-app.get('/api/shipments/export', async (req, res) => {
-  try {
-    const shipments = await Shipment.find().sort({ createdAt: -1 });
-
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('سجل التحجيم');
-
-    worksheet.columns = [
-      { header: 'رقم البوليصة (B/L)', key: 'blNumber', width: 20 },
-      { header: 'رقم الرحلة (Voyage)', key: 'voyageNumber', width: 15 },
-      { header: 'العميل (Consignee)', key: 'consignee', width: 30 },
-      { header: 'إجمالي القطع', key: 'totalPieces', width: 12 },
-      { header: 'إجمالي الحجم (CBM)', key: 'totalCBM', width: 18 },
-      { header: 'مستخرج بـ OCR', key: 'extractedFromOCR', width: 15 },
-      { header: 'الموظف', key: 'createdBy', width: 20 },
-      { header: 'تاريخ الإدخال', key: 'createdAt', width: 22 }
-    ];
-
-    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0284C7' } };
-
-    shipments.forEach(s => {
-      worksheet.addRow({
-        blNumber: s.blNumber,
-        voyageNumber: s.voyageNumber || '-',
-        consignee: s.consignee || '-',
-        totalPieces: s.totalPieces,
-        totalCBM: s.totalCBM,
-        extractedFromOCR: s.extractedFromOCR ? 'نعم' : 'لا',
-        createdBy: s.createdBy,
-        createdAt: s.createdAt.toLocaleString('ar-JO')
-      });
-    });
-
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=Tahjeem_Shipments.xlsx');
-
-    await workbook.xlsx.write(res);
-    res.end();
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
+// إدارة الطلبات
+app.post('/api/orders', async (req, res) => {
+  const db = await loadDB();
+  const newOrder = {
+    id: 'ORD-' + Math.floor(100000 + Math.random() * 900000),
+    createdAt: new Date().toISOString(),
+    createdBy: req.body.createdBy || 'Customer Service',
+    status: req.body.isManual ? 'طباعة يدوية' : 'بانتظار التحجيم',
+    isManualPrint: !!req.body.isManual,
+    bls: req.body.bls || [],
+    totalWeight: req.body.totalWeight || 0,
+    measurements: { length: '', width: '', height: '' },
+    vehicleType: '',
+    shareefNotes: req.body.shareefNotes || '',
+    measuredBy: null,
+    completedAt: req.body.isManual ? new Date().toISOString() : null
+  };
+  db.orders.unshift(newOrder);
+  await saveDB(db);
+  res.json(newOrder);
 });
 
-// 7. مسار مؤشرات الأداء والإنتاجية (KPIs)
-app.get('/api/kpi/summary', async (req, res) => {
-  try {
-    const totalShipments = await Shipment.countDocuments();
-    const totalPiecesAgg = await Shipment.aggregate([{ $group: { _id: null, total: { $sum: '$totalPieces' }, totalCBM: { $sum: '$totalCBM' } } }]);
-    
-    // إحصائيات لكل موظف
-    const userStats = await Shipment.aggregate([
-      {
-        $group: {
-          _id: '$createdBy',
-          shipmentsCount: { $sum: 1 },
-          piecesCount: { $sum: '$totalPieces' },
-          totalCBM: { $sum: '$totalCBM' }
-        }
-      },
-      { $sort: { shipmentsCount: -1 } }
-    ]);
+app.patch('/api/orders/:id/tahjeem', async (req, res) => {
+  const db = await loadDB();
+  const order = db.orders.find(o => o.id === req.params.id);
+  if (!order) return res.status(404).json({ error: 'Order not found' });
 
-    res.json({
-      success: true,
-      data: {
-        totalShipments,
-        totalPieces: totalPiecesAgg[0] ? totalPiecesAgg[0].total : 0,
-        totalCBM: totalPiecesAgg[0] ? parseFloat(totalPiecesAgg[0].totalCBM.toFixed(3)) : 0,
-        userPerformance: userStats
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
+  order.measurements = req.body.measurements;
+  order.vehicleType = req.body.vehicleType || '';
+  order.shareefNotes = req.body.shareefNotes || '';
+  order.measuredBy = req.body.measuredBy || 'Warehouse Staff';
+  order.status = 'تم التحجيم';
+  order.completedAt = new Date().toISOString();
+
+  await saveDB(db);
+  res.json(order);
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Tahjeem server running on port ${PORT}`);
+app.delete('/api/orders/clean', async (req, res) => {
+  const days = parseInt(req.query.days) || 7;
+  const db = await loadDB();
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  db.orders = db.orders.filter(o => new Date(o.createdAt) >= cutoff);
+  await saveDB(db);
+  res.json({ success: true, count: db.orders.length });
 });
+
+app.delete('/api/orders/clear-all', async (req, res) => {
+  const db = await loadDB();
+  db.orders = [];
+  await saveDB(db);
+  res.json({ success: true, message: 'Archive cleared' });
+});
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log(`Tahjeem ALV server running on port ${PORT}`));
