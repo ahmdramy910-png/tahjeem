@@ -2,17 +2,17 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const mongoose = require('mongoose');
-const OpenAI = require('openai');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 app.use(cors());
 app.use(express.json({ limit: '25mb' }));
 app.use(express.static('public'));
 
+// --- MongoDB Atlas Connection ---
 const MONGODB_URI = process.env.MONGODB_URI;
 
 const AppStateSchema = new mongoose.Schema({
@@ -30,11 +30,11 @@ if (MONGODB_URI) {
   mongoose.connect(MONGODB_URI)
     .then(async () => {
       isConnectedToMongo = true;
-      console.log('✅ Connected to MongoDB Atlas');
+      console.log('✅ Connected permanently to MongoDB Atlas');
       const doc = await AppState.findOne({ key: 'main_state' });
       if (!doc) await AppState.create({ key: 'main_state', users: [], orders: [] });
     })
-    .catch(err => console.error('MongoDB error:', err.message));
+    .catch(err => console.error('⚠️ MongoDB error:', err.message));
 }
 
 async function loadDB() {
@@ -64,12 +64,13 @@ async function saveDB(data) {
   }
 }
 
-// المستخدمين وتسجيل الدخول
+// 1. قائمة الموظفين
 app.get('/api/users/list', async (req, res) => {
   const db = await loadDB();
   res.json((db.users || []).map(u => ({ id: u.id, name: u.name, role: u.role })));
 });
 
+// 2. تسجيل الدخول
 app.post('/api/login', async (req, res) => {
   const { userId, password } = req.body;
   const db = await loadDB();
@@ -80,6 +81,7 @@ app.post('/api/login', async (req, res) => {
   res.json({ success: true, user: { id: user.id, name: user.name, role: user.role } });
 });
 
+// 3. تسجيل موظف جديد
 app.post('/api/users/register', async (req, res) => {
   const { name, role, password } = req.body;
   if (!name || !password || password.length < 8) {
@@ -95,99 +97,105 @@ app.post('/api/users/register', async (req, res) => {
   res.json({ success: true, user: { id: newUser.id, name: newUser.name, role: newUser.role } });
 });
 
+// 4. جلب الطلبات
 app.get('/api/data', async (req, res) => {
   const db = await loadDB();
   res.json({ orders: db.orders });
 });
 
-// مؤشرات الأداء والإنتاجية
+// 5. سجل الإنتاجية اليومي مفصل تاريخياً (يوم بيوم)
 app.get('/api/stats', async (req, res) => {
   const db = await loadDB();
-  const stats = {};
-  (db.users || []).forEach(u => {
-    stats[u.name] = { role: u.role === 'cs' ? 'Customer Service' : 'Warehouse', totalBLs: 0, totalCars: 0 };
-  });
+  const dailyStats = {};
+
   (db.orders || []).forEach(order => {
     const blCount = (order.bls || []).length;
-    if (!blCount) return;
-    if (order.createdBy) {
-      if (!stats[order.createdBy]) stats[order.createdBy] = { role: 'CS', totalBLs: 0, totalCars: 0 };
-      stats[order.createdBy].totalBLs += blCount;
-      stats[order.createdBy].totalCars += 1;
+    if (blCount === 0) return;
+
+    const dateKey = order.createdAt ? new Date(order.createdAt).toISOString().split('T')[0] : 'Unknown';
+
+    if (!dailyStats[dateKey]) {
+      dailyStats[dateKey] = {};
     }
-    if (order.measuredBy && order.measuredBy !== order.createdBy && order.status === 'تم التحجيم') {
-      if (!stats[order.measuredBy]) stats[order.measuredBy] = { role: 'Warehouse', totalBLs: 0, totalCars: 0 };
-      stats[order.measuredBy].totalBLs += blCount;
-      stats[order.measuredBy].totalCars += 1;
+
+    const creator = order.createdBy;
+    if (creator) {
+      if (!dailyStats[dateKey][creator]) {
+        dailyStats[dateKey][creator] = { role: 'Customer Service', totalBLs: 0, totalCars: 0 };
+      }
+      dailyStats[dateKey][creator].totalBLs += blCount;
+      dailyStats[dateKey][creator].totalCars += 1;
+    }
+
+    const measurer = order.measuredBy;
+    if (measurer && measurer !== creator && order.status === 'تم التحجيم') {
+      if (!dailyStats[dateKey][measurer]) {
+        dailyStats[dateKey][measurer] = { role: 'Warehouse', totalBLs: 0, totalCars: 0 };
+      }
+      dailyStats[dateKey][measurer].totalBLs += blCount;
+      dailyStats[dateKey][measurer].totalCars += 1;
     }
   });
-  res.json(stats);
+
+  res.json(dailyStats);
 });
 
-// محرك OCR بدقة Structured Outputs عبر gpt-4o-mini
+// 6. OCR using GitHub Models (GPT-4o)
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image provided' });
 
-    if (!process.env.OPENAI_API_KEY) {
-      return res.status(500).json({ error: 'OPENAI_API_KEY variable is missing in Render Environment' });
-    }
+    const token = process.env.ai_yahjeem;
+    if (!token) return res.status(500).json({ error: 'ai_yahjeem variable is missing in Render Environment' });
 
     const base64Data = req.file.buffer.toString('base64');
     const mimeType = req.file.mimetype || 'image/png';
     const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
     const prompt = `Logistics OCR task for Sage CRM window.
-Extract the logistics values accurately.
+Extract the logistics values accurately. Respond ONLY with a valid JSON object. No preamble, no backticks.
+
 RULES:
 1. Alphanumerics: Serial numbers and B/L identifiers always contain the DIGIT '0', NOT letter 'O'.
-2. Quantity (qty): Extract as pure integer string (e.g. "55").
-3. Weight: Rounded UP to the nearest 0.1 ton (e.g. 1.611 -> "1.7").
+2. Quantity (qty): Extract as pure integer (e.g. 55).
+3. Weight: Rounded UP to the nearest 0.1 ton (e.g. 1.611 -> 1.7).
 4. Accurately transcribe clearance company name and warehouse location code.
-If any field is missing from the image, set it to an empty string "".`;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert OCR assistant for logistics screens. Output must strictly adhere to the JSON schema."
-        },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: prompt },
-            { type: "image_url", image_url: { url: dataUrl, detail: "high" } }
-          ]
-        }
-      ],
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "sage_crm_fields",
-          strict: true,
-          schema: {
-            type: "object",
-            properties: {
-              blNumber: { type: "string", description: "B/L identifier" },
-              alvSerial: { type: "string", description: "ALV Serial number" },
-              qty: { type: "string", description: "Quantity of packages as a string" },
-              weight: { type: "string", description: "Weight rounded up to 0.1 ton as a string" },
-              pallets: { type: "string", description: "Number of pallets" },
-              location: { type: "string", description: "Warehouse location code" },
-              clearanceCompany: { type: "string", description: "Clearance company name" }
-            },
-            required: ["blNumber", "alvSerial", "qty", "weight", "pallets", "location", "clearanceCompany"],
-            additionalProperties: false
-          }
-        }
+Output strictly:
+{"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
+
+    const response = await fetch('https://models.github.ai/inference/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token.trim()}`,
+        'Content-Type': 'application/json'
       },
-      temperature: 0.0
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: dataUrl } }
+            ]
+          }
+        ],
+        temperature: 0.0,
+        response_format: { type: "json_object" }
+      })
     });
 
-    const parsed = JSON.parse(completion.choices[0].message.content);
+    const data = await response.json();
 
-    // تنظيف الأرقام الإضافي لضمان الدقة
+    if (!response.ok) {
+      console.error('GitHub Models API Error:', data);
+      return res.status(response.status).json({ error: data.error?.message || 'Error from GitHub Models service' });
+    }
+
+    const rawContent = data.choices?.[0]?.message?.content || '{}';
+    const parsed = JSON.parse(rawContent);
+
     if (parsed.qty) {
       const cleanQty = parseInt(String(parsed.qty).replace(/,/g, ''), 10);
       parsed.qty = isNaN(cleanQty) ? parsed.qty : String(cleanQty);
@@ -205,7 +213,7 @@ If any field is missing from the image, set it to an empty string "".`;
   }
 });
 
-// إدارة الطلبات
+// 7. إنشاء طلب جديد
 app.post('/api/orders', async (req, res) => {
   const db = await loadDB();
   const newOrder = {
@@ -227,6 +235,7 @@ app.post('/api/orders', async (req, res) => {
   res.json(newOrder);
 });
 
+// 8. حفظ التحجيم
 app.patch('/api/orders/:id/tahjeem', async (req, res) => {
   const db = await loadDB();
   const order = db.orders.find(o => o.id === req.params.id);
@@ -243,6 +252,7 @@ app.patch('/api/orders/:id/tahjeem', async (req, res) => {
   res.json(order);
 });
 
+// 9. تنظيف الطلبات القديمة
 app.delete('/api/orders/clean', async (req, res) => {
   const days = parseInt(req.query.days) || 7;
   const db = await loadDB();
@@ -252,6 +262,7 @@ app.delete('/api/orders/clean', async (req, res) => {
   res.json({ success: true, count: db.orders.length });
 });
 
+// 10. تفريغ الأرشيف
 app.delete('/api/orders/clear-all', async (req, res) => {
   const db = await loadDB();
   db.orders = [];
@@ -260,4 +271,4 @@ app.delete('/api/orders/clear-all', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`Tahjeem ALV server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
