@@ -64,7 +64,7 @@ async function saveDB(data) {
   }
 }
 
-// مسارات المستخدمين والمصادقة
+// مسارات المستخدمين وتسجيل الدخول
 app.get('/api/users/list', async (req, res) => {
   const db = await loadDB();
   res.json((db.users || []).map(u => ({ id: u.id, name: u.name, role: u.role })));
@@ -124,7 +124,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// نقطة فحص الـ OCR عبر gpt-4o-mini مع Structured Outputs
+// نقطة فحص الـ OCR عبر gpt-4o-mini مع التقريب الرياضي الصارم للوزن
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image provided' });
@@ -138,11 +138,11 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
     const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
     const prompt = `Logistics OCR task for Sage CRM window.
-Extract the logistics values accurately.
+Extract the logistics values accurately as raw text from the screen.
 RULES:
 1. Alphanumerics: Serial numbers and B/L identifiers always contain the DIGIT '0', NOT letter 'O'.
-2. Quantity (qty): Extract as pure integer string (e.g. "55").
-3. Weight: Rounded UP to the nearest 0.1 ton (e.g. 1.611 -> "1.7").
+2. Quantity (qty): Extract as integer string (e.g. "55").
+3. Weight: Extract the EXACT raw weight number as displayed in the image without any rounding (e.g. "1.04", "1.611").
 4. Accurately transcribe clearance company name and warehouse location code.
 If any field is missing, set its value to an empty string "".`;
 
@@ -172,7 +172,7 @@ If any field is missing, set its value to an empty string "".`;
               blNumber: { type: "string", description: "B/L identifier" },
               alvSerial: { type: "string", description: "ALV Serial number" },
               qty: { type: "string", description: "Quantity of packages" },
-              weight: { type: "string", description: "Weight rounded up to 0.1 ton" },
+              weight: { type: "string", description: "Exact raw weight displayed on screen" },
               pallets: { type: "string", description: "Number of pallets" },
               location: { type: "string", description: "Warehouse location code" },
               clearanceCompany: { type: "string", description: "Clearance company name" }
@@ -187,6 +187,7 @@ If any field is missing, set its value to an empty string "".`;
 
     const parsed = JSON.parse(completion.choices[0].message.content);
 
+    // 1. تنظيف الأعداد
     if (parsed.qty) {
       const cleanQty = parseInt(String(parsed.qty).replace(/,/g, ''), 10);
       parsed.qty = isNaN(cleanQty) ? parsed.qty : String(cleanQty);
@@ -194,6 +195,18 @@ If any field is missing, set its value to an empty string "".`;
     if (parsed.pallets) {
       const cleanPallets = parseInt(String(parsed.pallets).replace(/,/g, ''), 10);
       parsed.pallets = isNaN(cleanPallets) ? parsed.pallets : String(cleanPallets);
+    }
+
+    // 2. التقريب الرياضي الصارم للوزن للأعلى دائماً لأقرب 0.1 (Round UP to nearest 0.1)
+    if (parsed.weight) {
+      const rawWeight = parseFloat(String(parsed.weight).replace(/,/g, ''));
+      if (!isNaN(rawWeight) && rawWeight > 0) {
+        // مثال: 1.04 * 10 = 10.4 -> Math.ceil = 11 -> / 10 = 1.1
+        // مثال: 1.00001 * 10 = 10.0001 -> Math.ceil = 11 -> / 10 = 1.1
+        // مثال: 1.000 * 10 = 10 -> Math.ceil = 10 -> / 10 = 1.0
+        const roundedWeight = Math.ceil(parseFloat(rawWeight.toFixed(5)) * 10) / 10;
+        parsed.weight = roundedWeight.toFixed(1);
+      }
     }
 
     return res.json(parsed);
