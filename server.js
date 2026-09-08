@@ -150,7 +150,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// نقطة فحص الـ OCR عبر gpt-4o-mini
+// محرك OCR الشامل عالي الدقة دون شروط مقيدة مشتتة
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image provided' });
@@ -163,25 +163,27 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
     const mimeType = req.file.mimetype || 'image/png';
     const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
-    const prompt = `Logistics OCR task for Sage CRM window.
-Extract all logistics values EXACTLY as printed on the screen without omitting, truncating, abbreviating, or modifying any character.
+    const prompt = `You are a high-precision OCR engine for logistics shipment screens.
+Perform an exact, verbatim, character-by-character transcription of the visible fields.
+Do not guess, auto-correct, modify, truncate, or omit any numbers or letters. Transcribe exactly what is visually present in the image.
 
-CRITICAL RULES:
-1. B/L Number (blNumber): Copy the EXACT text verbatim, character-by-character, as displayed on the screen.
-   - NEVER drop, shorten, or change any letter, symbol, or digit.
-   - Do NOT assume any letter is a typo (e.g. "4052joaqb" must stay "4052joaqb" exactly as seen, never drop the 'o' or convert to "jaqb").
-2. ALV Serial (alvSerial): Extract the exact serial number text as shown on screen.
-3. Quantity (qty): Extract as integer string (e.g. "55").
-4. Weight: Extract the EXACT raw weight number displayed in the image without rounding (e.g. "1.04", "1.611").
-5. Clearance Company & Location: Transcribe clearance company and warehouse location code accurately.
-If any field is missing from the image, set its value to an empty string "".`;
+Extract the following:
+1. blNumber: The full, exact B/L number as displayed.
+2. alvSerial: The full, exact serial number as displayed.
+3. qty: The exact package quantity as displayed.
+4. weight: The raw numeric weight exactly as shown without any rounding or alteration.
+5. pallets: The exact number of pallets as displayed (or "0" if zero).
+6. location: The exact warehouse location / bay code.
+7. clearanceCompany: The exact name of the clearance company. Do not include phone numbers or contact digits.
+
+If any field is completely absent or empty in the image, return "".`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: "You are an ultra-precise OCR assistant for logistics screens. Transcribe strings exactly as visible without making assumptions, corrections, or abbreviations. Output strictly in valid JSON."
+          content: "You are a professional OCR model. Your task is 100% faithful and verbatim character-for-character transcription from the image into structured JSON."
         },
         {
           role: "user",
@@ -194,17 +196,17 @@ If any field is missing from the image, set its value to an empty string "".`;
       response_format: {
         type: "json_schema",
         json_schema: {
-          name: "sage_crm_fields",
+          name: "shipment_ocr_data",
           strict: true,
           schema: {
             type: "object",
             properties: {
-              blNumber: { type: "string", description: "Verbatim unabbreviated B/L number string" },
-              alvSerial: { type: "string", description: "Verbatim Serial number string" },
-              qty: { type: "string", description: "Quantity of packages" },
-              weight: { type: "string", description: "Raw exact weight string without rounding" },
-              pallets: { type: "string", description: "Number of pallets" },
-              location: { type: "string", description: "Warehouse location code" },
+              blNumber: { type: "string", description: "Verbatim B/L number" },
+              alvSerial: { type: "string", description: "Verbatim serial number" },
+              qty: { type: "string", description: "Package quantity" },
+              weight: { type: "string", description: "Exact raw weight string" },
+              pallets: { type: "string", description: "Pallets count string" },
+              location: { type: "string", description: "Warehouse location string" },
               clearanceCompany: { type: "string", description: "Clearance company name" }
             },
             required: ["blNumber", "alvSerial", "qty", "weight", "pallets", "location", "clearanceCompany"],
@@ -217,17 +219,25 @@ If any field is missing from the image, set its value to an empty string "".`;
 
     const parsed = JSON.parse(completion.choices[0].message.content);
 
-    // 1. تنظيف الأعداد
+    // 1. تنظيف الأعداد بدقة رياضية
     if (parsed.qty) {
       const cleanQty = parseInt(String(parsed.qty).replace(/,/g, ''), 10);
       parsed.qty = isNaN(cleanQty) ? parsed.qty : String(cleanQty);
     }
-    if (parsed.pallets) {
+    if (parsed.pallets !== undefined && parsed.pallets !== null && parsed.pallets !== '') {
       const cleanPallets = parseInt(String(parsed.pallets).replace(/,/g, ''), 10);
-      parsed.pallets = isNaN(cleanPallets) ? parsed.pallets : String(cleanPallets);
+      parsed.pallets = isNaN(cleanPallets) ? String(parsed.pallets).trim() : String(cleanPallets);
     }
 
-    // 2. التقريب الرياضي الصارم للوزن للأعلى دائماً لأقرب 0.1
+    // 2. تنظيف اسم شركة التخليص برمجياً (حذف أرقام الهواتف أو الفاكس إن وجدت بجانب الاسم)
+    if (parsed.clearanceCompany) {
+      parsed.clearanceCompany = parsed.clearanceCompany
+        .replace(/(?:tel|phone|mob|fax|هاتف|تلفون|خلوي|فاكس)?[:\s]*\+?\d[\d\s\-\/]{6,}\d/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    // 3. التقريب الرياضي الصارم للوزن للأعلى دائماً لأقرب 0.1 (Math.ceil)
     if (parsed.weight) {
       const rawWeight = parseFloat(String(parsed.weight).replace(/,/g, ''));
       if (!isNaN(rawWeight) && rawWeight > 0) {
