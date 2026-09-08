@@ -124,7 +124,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// نقطة فحص الـ OCR عبر gpt-4o-mini مع التقريب الرياضي الصارم للوزن
+// نقطة فحص الـ OCR عبر gpt-4o-mini
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image provided' });
@@ -138,20 +138,24 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
     const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
     const prompt = `Logistics OCR task for Sage CRM window.
-Extract the logistics values accurately as raw text from the screen.
-RULES:
-1. Alphanumerics: Serial numbers and B/L identifiers always contain the DIGIT '0', NOT letter 'O'.
-2. Quantity (qty): Extract as integer string (e.g. "55").
-3. Weight: Extract the EXACT raw weight number as displayed in the image without any rounding (e.g. "1.04", "1.611").
-4. Accurately transcribe clearance company name and warehouse location code.
-If any field is missing, set its value to an empty string "".`;
+Extract all logistics values EXACTLY as printed on the screen without omitting, truncating, abbreviating, or modifying any character.
+
+CRITICAL RULES:
+1. B/L Number (blNumber): Copy the EXACT text verbatim, character-by-character, as displayed on the screen.
+   - NEVER drop, shorten, or change any letter, symbol, or digit.
+   - Do NOT assume any letter is a typo (e.g. "4052joaqb" must stay "4052joaqb" exactly as seen, never drop the 'o' or convert to "jaqb").
+2. ALV Serial (alvSerial): Extract the exact serial number text as shown on screen.
+3. Quantity (qty): Extract as integer string (e.g. "55").
+4. Weight: Extract the EXACT raw weight number displayed in the image without rounding (e.g. "1.04", "1.611").
+5. Clearance Company & Location: Transcribe clearance company and warehouse location code accurately.
+If any field is missing from the image, set its value to an empty string "".`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: "You are an expert OCR assistant for logistics systems. Strict JSON output required."
+          content: "You are an ultra-precise OCR assistant for logistics screens. Transcribe strings exactly as visible without making assumptions, corrections, or abbreviations. Output strictly in valid JSON."
         },
         {
           role: "user",
@@ -169,10 +173,10 @@ If any field is missing, set its value to an empty string "".`;
           schema: {
             type: "object",
             properties: {
-              blNumber: { type: "string", description: "B/L identifier" },
-              alvSerial: { type: "string", description: "ALV Serial number" },
+              blNumber: { type: "string", description: "Verbatim unabbreviated B/L number string" },
+              alvSerial: { type: "string", description: "Verbatim ALV Serial number string" },
               qty: { type: "string", description: "Quantity of packages" },
-              weight: { type: "string", description: "Exact raw weight displayed on screen" },
+              weight: { type: "string", description: "Raw exact weight string without rounding" },
               pallets: { type: "string", description: "Number of pallets" },
               location: { type: "string", description: "Warehouse location code" },
               clearanceCompany: { type: "string", description: "Clearance company name" }
@@ -201,9 +205,6 @@ If any field is missing, set its value to an empty string "".`;
     if (parsed.weight) {
       const rawWeight = parseFloat(String(parsed.weight).replace(/,/g, ''));
       if (!isNaN(rawWeight) && rawWeight > 0) {
-        // مثال: 1.04 * 10 = 10.4 -> Math.ceil = 11 -> / 10 = 1.1
-        // مثال: 1.00001 * 10 = 10.0001 -> Math.ceil = 11 -> / 10 = 1.1
-        // مثال: 1.000 * 10 = 10 -> Math.ceil = 10 -> / 10 = 1.0
         const roundedWeight = Math.ceil(parseFloat(rawWeight.toFixed(5)) * 10) / 10;
         parsed.weight = roundedWeight.toFixed(1);
       }
