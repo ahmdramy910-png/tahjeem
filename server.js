@@ -30,11 +30,11 @@ if (MONGODB_URI) {
   mongoose.connect(MONGODB_URI)
     .then(async () => {
       isConnectedToMongo = true;
-      console.log('✅ Connected permanently to MongoDB Atlas');
+      console.log('✅ Connected to MongoDB Atlas');
       const doc = await AppState.findOne({ key: 'main_state' });
       if (!doc) await AppState.create({ key: 'main_state', users: [], orders: [] });
     })
-    .catch(err => console.error('⚠️ MongoDB error:', err.message));
+    .catch(err => console.error('MongoDB error:', err.message));
 }
 
 async function loadDB() {
@@ -64,32 +64,59 @@ async function saveDB(data) {
   }
 }
 
-// 1. قائمة الموظفين
+// دالة مساعدة لتحديد تاريخ ويوم الشفت (من 8 صباحاً إلى 4 عصراً)
+function getShiftInfo(isoDateString) {
+  const d = new Date(isoDateString);
+  // تحويل التوقيت إلى توقيت الأردن (+3)
+  const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+  const jordanTime = new Date(utc + (3600000 * 3));
+
+  const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+  const dayName = days[jordanTime.getDay()];
+  
+  const yyyy = jordanTime.getFullYear();
+  const mm = String(jordanTime.getMonth() + 1).padStart(2, '0');
+  const dd = String(jordanTime.getDate()).padStart(2, '0');
+  const dateKey = `${yyyy}-${mm}-${dd}`;
+
+  const hour = jordanTime.getHours();
+  // الدوام الرسمي: 8 صباحاً لغاية 4 عصراً (8:00 إلى 15:59:59)
+  const isWithinShift = (hour >= 8 && hour < 16);
+
+  return {
+    dateKey,
+    dayName,
+    isWithinShift,
+    formattedDate: `${dayName} (${dateKey})`
+  };
+}
+
+// 1. Users List
 app.get('/api/users/list', async (req, res) => {
   const db = await loadDB();
   res.json((db.users || []).map(u => ({ id: u.id, name: u.name, role: u.role })));
 });
 
-// 2. تسجيل الدخول
+// 2. Login
 app.post('/api/login', async (req, res) => {
   const { userId, password } = req.body;
   const db = await loadDB();
   const user = db.users.find(u => u.id === userId);
   if (!user || user.password !== password) {
-    return res.status(401).json({ error: 'Invalid user or password' });
+    return res.status(401).json({ error: 'كلمة المرور أو اسم المستخدم غير صحيح' });
   }
   res.json({ success: true, user: { id: user.id, name: user.name, role: user.role } });
 });
 
-// 3. تسجيل موظف جديد
+// 3. Register
 app.post('/api/users/register', async (req, res) => {
   const { name, role, password } = req.body;
   if (!name || !password || password.length < 8) {
-    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    return res.status(400).json({ error: 'كلمة المرور يجب أن لا تقل عن 8 خانات' });
   }
   const db = await loadDB();
   if (db.users.some(u => u.name.toLowerCase() === name.trim().toLowerCase())) {
-    return res.status(400).json({ error: 'Employee already registered' });
+    return res.status(400).json({ error: 'اسم الموظف مسجل مسبقاً' });
   }
   const newUser = { id: 'u_' + Date.now(), name: name.trim(), role: role || 'cs', password: password.trim() };
   db.users.push(newUser);
@@ -97,56 +124,94 @@ app.post('/api/users/register', async (req, res) => {
   res.json({ success: true, user: { id: newUser.id, name: newUser.name, role: newUser.role } });
 });
 
-// 4. جلب الطلبات
+// 4. Get Orders
 app.get('/api/data', async (req, res) => {
   const db = await loadDB();
   res.json({ orders: db.orders });
 });
 
-// 5. سجل الإنتاجية اليومي مفصل تاريخياً (يوم بيوم)
+// 5. إحصائيات مفصلة يوم بيوم مع وقت الدوام (8 ص - 4 ع)
 app.get('/api/stats', async (req, res) => {
   const db = await loadDB();
-  const dailyStats = {};
+  const dailyReport = {};
 
   (db.orders || []).forEach(order => {
     const blCount = (order.bls || []).length;
     if (blCount === 0) return;
 
-    const dateKey = order.createdAt ? new Date(order.createdAt).toISOString().split('T')[0] : 'Unknown';
+    const shift = getShiftInfo(order.createdAt || new Date());
+    const dateKey = shift.dateKey;
 
-    if (!dailyStats[dateKey]) {
-      dailyStats[dateKey] = {};
+    if (!dailyReport[dateKey]) {
+      dailyReport[dateKey] = {
+        date: dateKey,
+        dayName: shift.dayName,
+        label: shift.formattedDate,
+        employees: {}
+      };
     }
 
+    // إحصائية موظف خدمة العملاء
     const creator = order.createdBy;
     if (creator) {
-      if (!dailyStats[dateKey][creator]) {
-        dailyStats[dateKey][creator] = { role: 'Customer Service', totalBLs: 0, totalCars: 0 };
+      if (!dailyReport[dateKey].employees[creator]) {
+        dailyReport[dateKey].employees[creator] = {
+          name: creator,
+          role: 'خدمة العملاء (CS)',
+          shiftBLs: 0,
+          shiftCars: 0,
+          afterHoursBLs: 0,
+          totalBLs: 0,
+          totalCars: 0
+        };
       }
-      dailyStats[dateKey][creator].totalBLs += blCount;
-      dailyStats[dateKey][creator].totalCars += 1;
+      const emp = dailyReport[dateKey].employees[creator];
+      emp.totalBLs += blCount;
+      emp.totalCars += 1;
+      if (shift.isWithinShift) {
+        emp.shiftBLs += blCount;
+        emp.shiftCars += 1;
+      } else {
+        emp.afterHoursBLs += blCount;
+      }
     }
 
+    // إحصائية موظف المستودع / الساحة
     const measurer = order.measuredBy;
     if (measurer && measurer !== creator && order.status === 'تم التحجيم') {
-      if (!dailyStats[dateKey][measurer]) {
-        dailyStats[dateKey][measurer] = { role: 'Warehouse', totalBLs: 0, totalCars: 0 };
+      if (!dailyReport[dateKey].employees[measurer]) {
+        dailyReport[dateKey].employees[measurer] = {
+          name: measurer,
+          role: 'الساحة والمستودع',
+          shiftBLs: 0,
+          shiftCars: 0,
+          afterHoursBLs: 0,
+          totalBLs: 0,
+          totalCars: 0
+        };
       }
-      dailyStats[dateKey][measurer].totalBLs += blCount;
-      dailyStats[dateKey][measurer].totalCars += 1;
+      const emp = dailyReport[dateKey].employees[measurer];
+      emp.totalBLs += blCount;
+      emp.totalCars += 1;
+      if (shift.isWithinShift) {
+        emp.shiftBLs += blCount;
+        emp.shiftCars += 1;
+      } else {
+        emp.afterHoursBLs += blCount;
+      }
     }
   });
 
-  res.json(dailyStats);
+  res.json(dailyReport);
 });
 
 // 6. OCR using GitHub Models (GPT-4o)
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No image provided' });
+    if (!req.file) return res.status(400).json({ error: 'لم يتم إرسال أي صورة' });
 
     const token = process.env.ai_yahjeem;
-    if (!token) return res.status(500).json({ error: 'ai_yahjeem variable is missing in Render Environment' });
+    if (!token) return res.status(500).json({ error: 'ai_yahjeem غير معرف في Render' });
 
     const base64Data = req.file.buffer.toString('base64');
     const mimeType = req.file.mimetype || 'image/png';
@@ -190,7 +255,7 @@ Output strictly:
 
     if (!response.ok) {
       console.error('GitHub Models API Error:', data);
-      return res.status(response.status).json({ error: data.error?.message || 'Error from GitHub Models service' });
+      return res.status(response.status).json({ error: data.error?.message || 'خطأ في استجابة خدمة GitHub Models' });
     }
 
     const rawContent = data.choices?.[0]?.message?.content || '{}';
