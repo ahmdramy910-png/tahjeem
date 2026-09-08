@@ -82,7 +82,7 @@
 
       <div id="authError" class="text-rose-600 text-xs font-bold hidden bg-rose-50 p-2.5 rounded-lg border border-rose-200"></div>
 
-      <div class="pt-2 text-[11px] text-slate-400 border-t">
+      <div class="pt-2 text-[11px] text-slate-400 border-t">               
         Tahjeem ALV Digital Platform © 2026
       </div>
     </div>
@@ -239,20 +239,28 @@
         </div>
       </div>
 
-      <!-- 3. KPIs & Stats Section -->
+      <!-- 3. KPIs & Daily Shift Stats Section -->
       <div id="section-stats" class="hidden space-y-6">
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-left">
-          <div class="flex justify-between items-center mb-6 border-b pb-4 flex-wrap gap-4">
-            <div>
-              <h2 class="text-lg font-black text-blue-950">Employee Productivity Report</h2>
-              <p class="text-xs text-slate-500">Each trip order counts as 1 Car. Total B/Ls completed tracked accurately.</p>
+          
+          <!-- Shift Information Alert -->
+          <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex items-center justify-between flex-wrap gap-3">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">🕒</span>
+              <div>
+                <h4 class="text-sm font-bold text-blue-950">شفت العمل الرسمي المعتمد</h4>
+                <p class="text-xs text-blue-800">من الساعة <strong>08:00 صباحاً</strong> وحتى الساعة <strong>04:00 عصراً</strong>. يتم تسجيل أداء كل موظف يوم بيوم.</p>
+              </div>
             </div>
-            <button onclick="exportStatsToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow transition">
-              📊 تصدير إحصائية الإنتاجية (Excel)
+            <button onclick="exportStatsToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2">
+              <span>📊</span> تصدير التقرير اليومي الشامل (Excel)
             </button>
           </div>
-          <div id="statsCardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+          <!-- Container for Daily Cards -->
+          <div id="statsCardsContainer" class="space-y-6">
           </div>
+
         </div>
       </div>
 
@@ -268,16 +276,16 @@
             
             <div class="flex flex-wrap items-center gap-2 text-xs">
               <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 rounded-lg shadow transition">
-                📊 تصدير الأرشيف (Excel)
+                📊تصدير الأرشيف (Excel)
               </button>
               <button onclick="cleanOldOrders(7)" class="bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-2 rounded-lg shadow transition">
-                🧹 حذف الأقدم من 7 أيام
+                🧹حذف الأقدم من 7 أيام
               </button>
               <button onclick="cleanOldOrders(30)" class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-2 rounded-lg shadow transition">
-                🗑️ حذف الأقدم من 30 يوماً
+                🗑️حذف الأقدم من 30 يوماً
               </button>
               <button onclick="exportAndClearAll()" class="bg-red-800 hover:bg-black text-white font-extrabold px-3 py-2 rounded-lg shadow transition">
-                ⚠️ تفريغ كامل الأرشيف
+                ⚠️تفريغ كامل الأرشيف
               </button>
             </div>
           </div>
@@ -919,51 +927,98 @@
       loadData();
     }
 
+    // عرض الإحصائيات مقسمة حسب كل يوم بيومه ومحددة بوقت الشفت (8 ص - 4 ع)
     async function loadStats() {
       const res = await fetch('/api/stats');
-      const stats = await res.json();
+      const dailyData = await res.json();
       const container = document.getElementById('statsCardsContainer');
 
-      if (Object.keys(stats).length === 0) {
-        container.innerHTML = '<div class="col-span-3 text-center py-8 text-slate-400 font-bold">No KPI data recorded yet</div>';
+      const dates = Object.keys(dailyData).sort().reverse();
+
+      if (dates.length === 0) {
+        container.innerHTML = '<div class="text-center py-12 text-slate-400 font-bold">No KPI data recorded yet</div>';
         return;
       }
 
-      container.innerHTML = Object.entries(stats).map(([name, data]) => `
-        <div class="bg-gradient-to-br from-white to-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-          <div class="flex justify-between items-center border-b pb-3">
-            <div>
-              <h3 class="font-black text-lg text-blue-950">${name}</h3>
-              <span class="text-xs bg-blue-100 text-blue-900 px-2 py-0.5 rounded-md font-bold uppercase">${data.role}</span>
+      container.innerHTML = dates.map(dateKey => {
+        const dayInfo = dailyData[dateKey];
+        const employeesList = Object.values(dayInfo.employees);
+
+        const empCards = employeesList.map(emp => `
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+            <div class="flex justify-between items-center border-b pb-2">
+              <div>
+                <h4 class="font-black text-blue-950 text-sm sm:text-base">${emp.name}</h4>
+                <span class="text-[10px] bg-blue-100 text-blue-900 px-2 py-0.5 rounded font-bold uppercase">${emp.role}</span>
+              </div>
+              <span class="text-xl">👤</span>
             </div>
-            <div class="text-2xl">👤</div>
+
+            <!-- تفاصيل الشفت واليوم كامل -->
+            <div class="grid grid-cols-2 gap-2 text-center text-xs">
+              <div class="bg-blue-50/70 p-2.5 rounded-lg border border-blue-100">
+                <span class="text-[10px] text-blue-700 font-bold block mb-0.5">بوالص الشفت (8ص-4ع)</span>
+                <span class="text-xl font-black text-blue-900">${emp.shiftBLs}</span>
+              </div>
+              <div class="bg-emerald-50/70 p-2.5 rounded-lg border border-emerald-100">
+                <span class="text-[10px] text-emerald-700 font-bold block mb-0.5">سيارات الشفت</span>
+                <span class="text-xl font-black text-emerald-800">${emp.shiftCars}</span>
+              </div>
+              <div class="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                <span class="text-[10px] text-slate-500 font-semibold block mb-0.5">إجمالي البوالص (اليوم)</span>
+                <span class="text-sm font-extrabold text-slate-800">${emp.totalBLs}</span>
+              </div>
+              <div class="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                <span class="text-[10px] text-slate-500 font-semibold block mb-0.5">إجمالي السيارات</span>
+                <span class="text-sm font-extrabold text-slate-800">${emp.totalCars}</span>
+              </div>
+            </div>
           </div>
-          <div class="grid grid-cols-2 gap-3 text-center pt-2">
-            <div class="bg-blue-50 p-4 rounded-xl border border-blue-200">
-              <span class="text-xs text-slate-600 font-bold block mb-1">Total B/Ls Done</span>
-              <span class="text-3xl font-black text-blue-700">${data.totalBLs}</span>
+        `).join('');
+
+        return `
+          <div class="border border-slate-200 rounded-2xl p-5 bg-slate-50/70 shadow-sm space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-200 pb-3 flex-wrap gap-2">
+              <div class="flex items-center gap-2">
+                <span class="text-xl">📅</span>
+                <h3 class="text-base font-black text-blue-950">${dayInfo.dayName} <span class="text-slate-500 font-mono text-xs font-semibold">(${dayInfo.date})</span></h3>
+              </div>
+              <span class="text-xs bg-slate-200 text-slate-700 px-3 py-1 rounded-full font-bold">دوام رسمي: 8:00 ص - 4:00 ع</span>
             </div>
-            <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-200">
-              <span class="text-xs text-slate-600 font-bold block mb-1">Total Trips / Cars</span>
-              <span class="text-3xl font-black text-emerald-700">${data.totalCars}</span>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              ${empCards}
             </div>
           </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
+    // تصدير التقرير اليومي المفصل إلى ملف إكسل
     function exportStatsToExcel() {
-      fetch('/api/stats').then(r => r.json()).then(stats => {
-        const data = Object.entries(stats).map(([name, d]) => ({
-          'اسم الموظف': name,
-          'القسم / الدور': d.role,
-          'عدد البوالص المنجزة': d.totalBLs,
-          'عدد السيارات المطبوعة (الإجمالي)': d.totalCars
-        }));
-        const ws = XLSX.utils.json_to_sheet(data);
+      fetch('/api/stats').then(r => r.json()).then(dailyData => {
+        const rows = [];
+        const dates = Object.keys(dailyData).sort().reverse();
+
+        dates.forEach(dateKey => {
+          const dayInfo = dailyData[dateKey];
+          Object.values(dayInfo.employees).forEach(emp => {
+            rows.push({
+              'اليوم': dayInfo.dayName,
+              'التاريخ': dayInfo.date,
+              'اسم الموظف': emp.name,
+              'القسم': emp.role,
+              'بوالص شفت العمل (8ص - 4ع)': emp.shiftBLs,
+              'سيارات شفت العمل (8ص - 4ع)': emp.shiftCars,
+              'إجمالي بوالص اليوم بالكامل': emp.totalBLs,
+              'إجمالي سيارات اليوم بالكامل': emp.totalCars
+            });
+          });
+        });
+
+        const ws = XLSX.utils.json_to_sheet(rows);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "إنتاجية الموظفين");
-        XLSX.writeFile(wb, `احصائية_انجاز_الموظفين_${new Date().toISOString().slice(0,10)}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, "تقرير_الإنتاجية_اليومي");
+        XLSX.writeFile(wb, `تقرير_إنتاجية_الموظفين_اليومي_${new Date().toISOString().slice(0,10)}.xlsx`);
       });
     }
 
@@ -1091,7 +1146,7 @@
     }
 
     async function exportAndClearAll() {
-      if (!confirm('⚠️ تحذير: سيتم أولاً تحميل ملف إكسل بكامل السجلات، ثم تفريغ الأرشيف بالكامل من قاعدة البيانات.\nهل ترغب بالمتابعة؟')) return;
+      if (!confirm('⚠️تحذير: سيتم أولاً تحميل ملف إكسل بكامل السجلات، ثم تفريغ الأرشيف بالكامل من قاعدة البيانات.\nهل ترغب بالمتابعة؟')) return;
       exportToExcel();
       setTimeout(async () => {
         await fetch('/api/orders/clear-all', { method: 'DELETE' });
