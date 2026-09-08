@@ -64,7 +64,7 @@ async function saveDB(data) {
   }
 }
 
-// مسارات المستخدمين وتسجيل الدخول
+// مسارات المستخدمين
 app.get('/api/users/list', async (req, res) => {
   const db = await loadDB();
   res.json((db.users || []).map(u => ({ id: u.id, name: u.name, role: u.role })));
@@ -100,27 +100,53 @@ app.get('/api/data', async (req, res) => {
   res.json({ orders: db.orders });
 });
 
-// مؤشرات الأداء والإنتاجية (KPIs)
+// إحصائيات اليوم والإجمالي لكل موظف
 app.get('/api/stats', async (req, res) => {
   const db = await loadDB();
   const stats = {};
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   (db.users || []).forEach(u => {
-    stats[u.name] = { role: u.role === 'cs' ? 'Customer Service' : 'Warehouse', totalBLs: 0, totalCars: 0 };
+    stats[u.name] = { 
+      role: u.role === 'cs' ? 'Customer Service' : 'Warehouse', 
+      todayBLs: 0, 
+      todayCars: 0, 
+      totalBLs: 0, 
+      totalCars: 0 
+    };
   });
+
   (db.orders || []).forEach(order => {
     const blCount = (order.bls || []).length;
     if (!blCount) return;
+
+    const isToday = (order.createdAt || '').slice(0, 10) === todayStr;
+
     if (order.createdBy) {
-      if (!stats[order.createdBy]) stats[order.createdBy] = { role: 'CS', totalBLs: 0, totalCars: 0 };
+      if (!stats[order.createdBy]) {
+        stats[order.createdBy] = { role: 'CS', todayBLs: 0, todayCars: 0, totalBLs: 0, totalCars: 0 };
+      }
       stats[order.createdBy].totalBLs += blCount;
       stats[order.createdBy].totalCars += 1;
+      if (isToday) {
+        stats[order.createdBy].todayBLs += blCount;
+        stats[order.createdBy].todayCars += 1;
+      }
     }
+
     if (order.measuredBy && order.measuredBy !== order.createdBy && order.status === 'تم التحجيم') {
-      if (!stats[order.measuredBy]) stats[order.measuredBy] = { role: 'Warehouse', totalBLs: 0, totalCars: 0 };
+      if (!stats[order.measuredBy]) {
+        stats[order.measuredBy] = { role: 'Warehouse', todayBLs: 0, todayCars: 0, totalBLs: 0, totalCars: 0 };
+      }
       stats[order.measuredBy].totalBLs += blCount;
       stats[order.measuredBy].totalCars += 1;
+      if (isToday) {
+        stats[order.measuredBy].todayBLs += blCount;
+        stats[order.measuredBy].todayCars += 1;
+      }
     }
   });
+
   res.json(stats);
 });
 
@@ -174,7 +200,7 @@ If any field is missing from the image, set its value to an empty string "".`;
             type: "object",
             properties: {
               blNumber: { type: "string", description: "Verbatim unabbreviated B/L number string" },
-              alvSerial: { type: "string", description: "Verbatim ALV Serial number string" },
+              alvSerial: { type: "string", description: "Verbatim Serial number string" },
               qty: { type: "string", description: "Quantity of packages" },
               weight: { type: "string", description: "Raw exact weight string without rounding" },
               pallets: { type: "string", description: "Number of pallets" },
@@ -201,7 +227,7 @@ If any field is missing from the image, set its value to an empty string "".`;
       parsed.pallets = isNaN(cleanPallets) ? parsed.pallets : String(cleanPallets);
     }
 
-    // 2. التقريب الرياضي الصارم للوزن للأعلى دائماً لأقرب 0.1 (Round UP to nearest 0.1)
+    // 2. التقريب الرياضي الصارم للوزن للأعلى دائماً لأقرب 0.1
     if (parsed.weight) {
       const rawWeight = parseFloat(String(parsed.weight).replace(/,/g, ''));
       if (!isNaN(rawWeight) && rawWeight > 0) {
@@ -218,19 +244,19 @@ If any field is missing from the image, set its value to an empty string "".`;
   }
 });
 
-// إدارة الطلبات والتحجيم
+// حفظ الطلبات
 app.post('/api/orders', async (req, res) => {
   const db = await loadDB();
   const newOrder = {
     id: 'ORD-' + Math.floor(100000 + Math.random() * 900000),
     createdAt: new Date().toISOString(),
     createdBy: req.body.createdBy || 'Customer Service',
-    status: req.body.isManual ? 'طباعة يدوية' : 'بانتظار التحجيم',
+    status: req.body.isManual ? 'طباعة مباشرة' : 'بانتظار التحجيم',
     isManualPrint: !!req.body.isManual,
     bls: req.body.bls || [],
     totalWeight: req.body.totalWeight || 0,
     measurements: { length: '', width: '', height: '' },
-    vehicleType: '',
+    vehicleType: req.body.vehicleType || '',
     shareefNotes: req.body.shareefNotes || '',
     measuredBy: null,
     completedAt: req.body.isManual ? new Date().toISOString() : null
@@ -273,4 +299,4 @@ app.delete('/api/orders/clear-all', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`Tahjeem ALV server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Tahjeem server running on port ${PORT}`));
