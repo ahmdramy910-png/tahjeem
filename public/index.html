@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tahjeem Bi8 - Logistics Operations</title>
+  <title>TAHJEEM</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Cairo:wght@600;700;800;900&display=swap" rel="stylesheet">
@@ -11,7 +11,7 @@
     body { font-family: 'Inter', sans-serif; }
     .badge-tahjeem { background-color: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
     .badge-done { background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-    .badge-manual { background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+    .badge-manual { background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen">
@@ -24,8 +24,8 @@
         <div class="w-16 h-16 bg-blue-900 text-amber-400 rounded-2xl flex items-center justify-center mx-auto text-2xl font-black shadow-lg tracking-wider border-2 border-amber-400/30">
           Bi8
         </div>
-        <h2 class="text-2xl font-black text-blue-950 pt-2 tracking-tight">Tahjeem Bi8</h2>
-        <p class="text-xs text-slate-500 font-semibold">Logistics Systems • LCL Operations</p>
+        <h2 class="text-3xl font-black text-blue-950 pt-2 tracking-tight">Tahjeem</h2>
+        <p class="text-xs text-slate-400 font-semibold">Logistics Smart Platform</p>
       </div>
 
       <div class="grid grid-cols-2 p-1 bg-slate-100 rounded-xl text-xs sm:text-sm font-bold">
@@ -83,7 +83,7 @@
       <div id="authError" class="text-rose-600 text-xs font-bold hidden bg-rose-50 p-2.5 rounded-lg border border-rose-200"></div>
 
       <div class="pt-2 text-[11px] text-slate-400 border-t font-semibold">
-        Bi8 Digital Platform © 2026
+        Tahjeem Operations © 2026
       </div>
     </div>
   </div>
@@ -95,8 +95,7 @@
         <div class="flex items-center space-x-3">
           <span class="text-xl font-black bg-blue-950 text-amber-400 px-2.5 py-1 rounded-lg tracking-wider border border-amber-400/40">Bi8</span>
           <div>
-            <h1 class="text-lg font-black leading-none tracking-wide">Tahjeem Bi8</h1>
-            <span class="text-[11px] text-blue-200">Logistics Automation Systems</span>
+            <h1 class="text-xl font-black leading-none tracking-wide">Tahjeem</h1>
           </div>
         </div>
         <div class="flex items-center space-x-4 text-sm">
@@ -115,7 +114,7 @@
       <div class="flex border-b border-slate-300 mb-6 bg-white rounded-t-xl px-4 pt-2 shadow-sm flex-wrap gap-2 text-sm">
         <button onclick="switchTab('cs')" id="tab-cs" class="py-3 px-5 font-bold text-blue-600 border-b-4 border-blue-600 focus:outline-none transition">Customer Service</button>
         <button onclick="switchTab('warehouse')" id="tab-wh" class="py-3 px-5 font-bold text-slate-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition">Warehouse</button>
-        <button onclick="switchTab('stats')" id="tab-stats" class="py-3 px-5 font-bold text-slate-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition">KPIs & Stats</button>
+        <button onclick="switchTab('stats')" id="tab-stats" class="py-3 px-5 font-bold text-slate-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition">Daily KPIs & Stats</button>
         <button onclick="switchTab('archive')" id="tab-arc" class="py-3 px-5 font-bold text-slate-500 border-b-4 border-transparent hover:text-blue-600 focus:outline-none transition">Archive & Data</button>
       </div>
 
@@ -138,7 +137,7 @@
                 </label>
               </div>
               <input type="text" id="bl-0-no" placeholder="B/L No." class="w-full border rounded-lg px-3 py-1.5 text-xs sm:text-sm font-mono font-bold">
-              <input type="text" id="bl-0-alv" placeholder="ALV Serial" class="w-full border rounded-lg px-3 py-1.5 text-xs sm:text-sm font-mono">
+              <input type="text" id="bl-0-alv" placeholder="Serial No." class="w-full border rounded-lg px-3 py-1.5 text-xs sm:text-sm font-mono">
               <div class="grid grid-cols-3 gap-2">
                 <input type="number" id="bl-0-qty" placeholder="QTY" class="border rounded-lg px-2 py-1.5 text-xs text-center font-bold">
                 <input type="number" step="0.1" id="bl-0-weight" oninput="calcTotalWeight()" placeholder="Weight (T)" class="border rounded-lg px-2 py-1.5 text-xs text-center bg-amber-50 font-black text-blue-950">
@@ -158,7 +157,7 @@
                 </label>
               </div>
               <input type="text" id="bl-1-no" placeholder="B/L No." class="w-full border rounded-lg px-3 py-1.5 text-xs sm:text-sm font-mono font-bold">
-              <input type="text" id="bl-1-alv" placeholder="ALV Serial" class="w-full border rounded-lg px-3 py-1.5 text-xs sm:text-sm font-mono">
+              <input type="text" id="bl-1-alv" placeholder="Serial No." class="w-full border rounded-lg px-3 py-1.5 text-xs sm:text-sm font-mono">
               <div class="grid grid-cols-3 gap-2">
                 <input type="number" id="bl-1-qty" placeholder="QTY" class="border rounded-lg px-2 py-1.5 text-xs text-center font-bold">
                 <input type="number" step="0.1" id="bl-1-weight" oninput="calcTotalWeight()" placeholder="Weight (T)" class="border rounded-lg px-2 py-1.5 text-xs text-center bg-amber-50 font-black text-blue-950">
@@ -178,7 +177,7 @@
                 </label>
               </div>
               <input type="text" id="bl-2-no" placeholder="B/L No." class="w-full border rounded-lg px-3 py-1.5 text-xs sm:text-sm font-mono font-bold">
-              <input type="text" id="bl-2-alv" placeholder="ALV Serial" class="w-full border rounded-lg px-3 py-1.5 text-xs sm:text-sm font-mono">
+              <input type="text" id="bl-2-alv" placeholder="Serial No." class="w-full border rounded-lg px-3 py-1.5 text-xs sm:text-sm font-mono">
               <div class="grid grid-cols-3 gap-2">
                 <input type="number" id="bl-2-qty" placeholder="QTY" class="border rounded-lg px-2 py-1.5 text-xs text-center font-bold">
                 <input type="number" step="0.1" id="bl-2-weight" oninput="calcTotalWeight()" placeholder="Weight (T)" class="border rounded-lg px-2 py-1.5 text-xs text-center bg-amber-50 font-black text-blue-950">
@@ -194,10 +193,12 @@
               Total Weight: <span id="totalWeightDisplay" class="text-blue-700 font-black text-xl">0.00</span> Tons
             </div>
             <div class="flex gap-3">
+              <!-- زر الطباعة يطبع ويؤرشف فوراً بضغطة واحدة -->
               <button onclick="handleManualPrintAndSave()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-6 rounded-xl shadow transition flex items-center gap-1.5 text-xs sm:text-sm">
-                <span>🖨️ Print Slip</span>
+                <span>🖨️ Print & Save to Archive</span>
               </button>
-              <button onclick="submitOrder()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-6 rounded-xl shadow transition transform active:scale-95 flex items-center gap-1.5 text-xs sm:text-sm">
+              <!-- إمكانية الإرسال للويرهاوس لا تزال موجودة إن لزم الأمر -->
+              <button onclick="submitOrder()" class="bg-slate-700 hover:bg-slate-800 text-white font-bold py-2.5 px-5 rounded-xl shadow transition text-xs sm:text-sm">
                 <span>🚀 Send to Warehouse</span>
               </button>
             </div>
@@ -207,7 +208,7 @@
         <!-- Live Orders Queue -->
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
-            <h2 class="text-base font-extrabold text-slate-800">Live Operations Queue</h2>
+            <h2 class="text-base font-extrabold text-slate-800">Recent Operations</h2>
             <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow transition">📊 تصدير الطلبات (Excel)</button>
           </div>
           <div class="overflow-x-auto">
@@ -219,7 +220,6 @@
                   <th class="p-3">B/Ls & Location</th>
                   <th class="p-3">Weight</th>
                   <th class="p-3">Status</th>
-                  <th class="p-3">Vehicle</th>
                   <th class="p-3 text-center">Action</th>
                 </tr>
               </thead>
@@ -239,13 +239,13 @@
         </div>
       </div>
 
-      <!-- 3. KPIs & Stats Section -->
+      <!-- 3. KPIs & Stats Section (إنجاز اليوم المخصص) -->
       <div id="section-stats" class="hidden space-y-6">
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-left">
           <div class="flex justify-between items-center mb-6 border-b pb-4 flex-wrap gap-4">
             <div>
-              <h2 class="text-lg font-black text-blue-950">Employee Productivity Report</h2>
-              <p class="text-xs text-slate-500">Each trip order counts as 1 Car. Total B/Ls completed tracked accurately.</p>
+              <h2 class="text-xl font-black text-blue-950">Daily Productivity Report</h2>
+              <p class="text-xs text-slate-500">متابعة إنجاز كل موظف باليوم الحالي والإجمالي العام للشحنات والبوالص.</p>
             </div>
             <button onclick="exportStatsToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow transition">
               📊 تصدير إحصائية الإنتاجية (Excel)
@@ -263,7 +263,7 @@
           <div class="flex justify-between items-center mb-6 flex-wrap gap-4 border-b pb-4">
             <div>
               <h2 class="text-lg font-black text-blue-950">Archive & System Database</h2>
-              <p class="text-xs text-slate-500">Search records, export data, and manage storage quota.</p>
+              <p class="text-xs text-slate-500">جميع البوالص المطبوعة محفوظة هنا بشكل فوري ودائم.</p>
             </div>
             
             <div class="flex flex-wrap items-center gap-2 text-xs">
@@ -283,7 +283,7 @@
           </div>
 
           <div class="mb-4">
-            <input type="text" id="archiveSearchInput" oninput="filterArchive()" placeholder="Search B/L No., ALV Serial, Order ID, Clearance Co., or Employee..." class="w-full border-2 border-slate-200 rounded-xl p-3 text-xs sm:text-sm focus:outline-none focus:border-blue-600 shadow-sm">
+            <input type="text" id="archiveSearchInput" oninput="filterArchive()" placeholder="Search B/L No., Serial, Order ID, Clearance Co., or Employee..." class="w-full border-2 border-slate-200 rounded-xl p-3 text-xs sm:text-sm focus:outline-none focus:border-blue-600 shadow-sm">
           </div>
 
           <div class="overflow-x-auto rounded-xl border border-slate-200">
@@ -294,8 +294,6 @@
                   <th class="p-3">Staff</th>
                   <th class="p-3">B/Ls & Locations</th>
                   <th class="p-3">Weight</th>
-                  <th class="p-3">Dimensions (L×W×H)</th>
-                  <th class="p-3">Vehicle</th>
                   <th class="p-3">Status</th>
                   <th class="p-3 text-center">Print</th>
                 </tr>
@@ -569,6 +567,7 @@
       }
     }
 
+    // طباعة فورية وحفظ مباشر في الأرشيف
     async function handleManualPrintAndSave() {
       const bls = getFilledBLs();
       if (bls.length === 0) {
@@ -577,8 +576,10 @@
       }
       const totalWeight = parseFloat(document.getElementById('totalWeightDisplay').innerText) || 0;
 
+      // فتح نافذة الطباعة
       printFormalSlip(null);
 
+      // الحفظ المباشر في قاعدة البيانات والأرشيف
       await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -591,7 +592,7 @@
       });
 
       clearInputs();
-      loadData();
+      await loadData();
     }
 
     async function submitOrder() {
@@ -632,7 +633,7 @@
       calcTotalWeight();
     }
 
-    // ورقة الطباعة الرسمية بعلامة Bi8 التجارية
+    // ورقة الطباعة الرسمية
     function printFormalSlip(orderId) {
       let clearanceCompany = '';
       let dateStr = '';
@@ -672,11 +673,11 @@
       printWindow.document.write(`
         <html dir="rtl">
         <head>
-          <title>خدمة تحجيم - Bi8 Logistics</title>
+          <title>وصل تحجيم - TAHJEEM</title>
           <style>
             @page { size: A4 portrait; margin: 12mm; }
             body { font-family: 'Cairo', Tahoma, Arial, sans-serif; padding: 10px; color: #000; line-height: 1.5; font-size: 16px; }
-            .header-badge { display: inline-block; background: #000; color: #fff; padding: 3px 12px; border-radius: 6px; font-weight: 900; font-size: 20px; letter-spacing: 1px; margin-bottom: 4px; }
+            .header-badge { display: inline-block; background: #000; color: #fff; padding: 4px 14px; border-radius: 6px; font-weight: 900; font-size: 22px; letter-spacing: 1px; margin-bottom: 4px; }
             .header-title { text-align: center; font-size: 24px; font-weight: 900; margin-bottom: 2px; }
             .sub-title { text-align: center; font-size: 19px; font-weight: 700; margin-bottom: 22px; color: #222; }
             .top-info { display: flex; justify-content: space-between; margin-bottom: 18px; font-size: 17px; font-weight: 600; }
@@ -694,8 +695,8 @@
         <body>
           <div style="text-align: center;">
             <div class="header-badge font-en">Bi8</div>
-            <div class="header-title font-en">Bi8 Logistics Solutions</div>
-            <div class="sub-title">خدمة تحجيم وخروج الشحنات (LCL)</div>
+            <div class="header-title">وصل خدمة تحجيم الشحنات</div>
+            <div class="sub-title">(LCL Operations)</div>
           </div>
 
           <div class="top-info">
@@ -782,7 +783,7 @@
 
     function renderOrders() {
       const tbody = document.getElementById('ordersTableBody');
-      tbody.innerHTML = state.orders.map(order => {
+      tbody.innerHTML = state.orders.slice(0, 15).map(order => {
         const d = new Date(order.createdAt);
         const timeDisplay = `${formatDateEn(d)} • ${formatTime12(d)}`;
 
@@ -794,9 +795,9 @@
         `).join('');
 
         const isDone = order.status === 'تم التحجيم';
-        const isManual = order.status === 'طباعة يدوية';
+        const isManual = order.status === 'طباعة مباشرة';
         const badgeClass = isDone ? 'badge-done' : (isManual ? 'badge-manual' : 'badge-tahjeem');
-        const statusEn = isDone ? 'Completed' : (isManual ? 'Manual Printed' : 'Pending Tahjeem');
+        const statusEn = isDone ? 'Completed' : (isManual ? 'Archived / Printed' : 'Pending Tahjeem');
 
         return `
           <tr class="hover:bg-slate-50 transition">
@@ -808,7 +809,6 @@
             <td class="p-3">${blDetails}</td>
             <td class="p-3 font-black text-slate-800 whitespace-nowrap">${order.totalWeight} T</td>
             <td class="p-3"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeClass}">${statusEn}</span></td>
-            <td class="p-3 font-bold text-indigo-700 whitespace-nowrap">${order.vehicleType || '-'}</td>
             <td class="p-3 text-center whitespace-nowrap">
               <button onclick="printFormalSlip('${order.id}')" class="bg-slate-800 hover:bg-black text-white px-3 py-1 rounded-lg text-xs font-bold shadow">🖨️ Re-Print</button>
             </td>
@@ -853,7 +853,7 @@
               <div class="bg-white p-3 rounded-xl border text-xs shadow-sm space-y-1">
                 <div class="flex justify-between items-center border-b pb-1">
                   <div><span class="text-slate-500">B/L (${idx + 1}):</span> <b class="text-blue-900 font-mono text-sm">${b.blNumber}</b></div>
-                  <div class="bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-mono font-bold">Bi8: ${b.alvSerial || '-'}</div>
+                  <div class="bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-mono font-bold">Serial: ${b.alvSerial || '-'}</div>
                 </div>
                 <div class="grid grid-cols-4 gap-2 pt-1 font-semibold">
                   <div>Location: <b class="text-rose-600 bg-rose-50 px-1 rounded">${b.location || 'N/A'}</b></div>
@@ -923,6 +923,7 @@
       loadData();
     }
 
+    // عرض إحصائيات إنجاز اليوم الدقيقة
     async function loadStats() {
       const res = await fetch('/api/stats');
       const stats = await res.json();
@@ -934,22 +935,39 @@
       }
 
       container.innerHTML = Object.entries(stats).map(([name, data]) => `
-        <div class="bg-gradient-to-br from-white to-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
           <div class="flex justify-between items-center border-b pb-3">
             <div>
               <h3 class="font-black text-lg text-blue-950">${name}</h3>
-              <span class="text-xs bg-blue-100 text-blue-900 px-2 py-0.5 rounded-md font-bold uppercase">${data.role}</span>
+              <span class="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-bold uppercase">${data.role}</span>
             </div>
             <div class="text-2xl">👤</div>
           </div>
-          <div class="grid grid-cols-2 gap-3 text-center pt-2">
-            <div class="bg-blue-50 p-4 rounded-xl border border-blue-200">
-              <span class="text-xs text-slate-600 font-bold block mb-1">Total B/Ls Done</span>
-              <span class="text-3xl font-black text-blue-700">${data.totalBLs}</span>
+          
+          <!-- قسم اليوم -->
+          <div class="bg-amber-50/70 p-3 rounded-xl border border-amber-200">
+            <span class="text-xs font-black text-amber-900 block mb-2">⚡ إنجاز اليوم (Today):</span>
+            <div class="grid grid-cols-2 gap-2 text-center">
+              <div class="bg-white p-2.5 rounded-lg border border-amber-100">
+                <span class="text-[11px] text-slate-500 font-bold block">بوالص اليوم</span>
+                <span class="text-2xl font-black text-blue-700">${data.todayBLs}</span>
+              </div>
+              <div class="bg-white p-2.5 rounded-lg border border-amber-100">
+                <span class="text-[11px] text-slate-500 font-bold block">سيارات اليوم</span>
+                <span class="text-2xl font-black text-emerald-700">${data.todayCars}</span>
+              </div>
             </div>
-            <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-200">
-              <span class="text-xs text-slate-600 font-bold block mb-1">Total Trips / Cars</span>
-              <span class="text-3xl font-black text-emerald-700">${data.totalCars}</span>
+          </div>
+
+          <!-- قسم الإجمالي العام -->
+          <div class="grid grid-cols-2 gap-2 text-center pt-1">
+            <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+              <span class="text-[11px] text-slate-500 font-bold block">إجمالي البوالص</span>
+              <span class="text-lg font-black text-slate-700">${data.totalBLs}</span>
+            </div>
+            <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+              <span class="text-[11px] text-slate-500 font-bold block">إجمالي السيارات</span>
+              <span class="text-lg font-black text-slate-700">${data.totalCars}</span>
             </div>
           </div>
         </div>
@@ -960,14 +978,16 @@
       fetch('/api/stats').then(r => r.json()).then(stats => {
         const data = Object.entries(stats).map(([name, d]) => ({
           'اسم الموظف': name,
-          'القسم / الدور': d.role,
-          'عدد البوالص المنجزة': d.totalBLs,
-          'عدد السيارات المطبوعة (الإجمالي)': d.totalCars
+          'القسم': d.role,
+          'بوالص اليوم': d.todayBLs,
+          'سيارات اليوم': d.todayCars,
+          'إجمالي البوالص': d.totalBLs,
+          'إجمالي السيارات': d.totalCars
         }));
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "إنتاجية الموظفين");
-        XLSX.writeFile(wb, `احصائية_انجاز_الموظفين_${new Date().toISOString().slice(0,10)}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, "تقرير إنجاز اليوم");
+        XLSX.writeFile(wb, `تقرير_الانجاز_اليومي_${new Date().toISOString().slice(0,10)}.xlsx`);
       });
     }
 
@@ -976,7 +996,7 @@
       const ordersToDisplay = filteredOrders || state.orders;
 
       if (ordersToDisplay.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center p-8 text-slate-400 font-bold">No archive records found</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center p-8 text-slate-400 font-bold">No archive records found</td></tr>`;
         return;
       }
 
@@ -987,20 +1007,16 @@
         const blsRows = order.bls.map((b, i) => `
           <div class="mb-1 pb-1 border-b border-slate-100 last:border-0 text-xs">
             <b class="text-blue-950 font-mono">B/L (${i+1}): ${b.blNumber}</b> 
-            | <span class="text-amber-700 font-mono font-bold">Bi8: ${b.alvSerial || '-'}</span>
+            | <span class="text-slate-500 font-mono">Serial: ${b.alvSerial || '-'}</span>
             | <span class="text-rose-600 font-bold">${b.location || '-'}</span>
             ${b.clearanceCompany ? `| <span class="text-slate-600 font-semibold">${b.clearanceCompany}</span>` : ''}
           </div>
         `).join('');
 
-        const dims = order.measurements?.length 
-          ? `<div class="font-mono text-xs font-bold text-slate-700">${order.measurements.length} × ${order.measurements.width} × ${order.measurements.height} m</div>` 
-          : '<span class="text-slate-400 text-xs">-</span>';
-
         const isDone = order.status === 'تم التحجيم';
-        const isManual = order.status === 'طباعة يدوية';
+        const isManual = order.status === 'طباعة مباشرة';
         const badgeClass = isDone ? 'badge-done' : (isManual ? 'badge-manual' : 'badge-tahjeem');
-        const statusEn = isDone ? 'Completed' : (isManual ? 'Manual Printed' : 'Pending Tahjeem');
+        const statusEn = isDone ? 'Completed' : (isManual ? 'Archived' : 'Pending');
 
         return `
           <tr class="hover:bg-blue-50/40 transition">
@@ -1010,15 +1026,11 @@
             </td>
             <td class="p-3">
               <div class="font-bold text-slate-800">${order.createdBy || '-'}</div>
-              ${order.measuredBy ? `<div class="text-[10px] text-slate-400">WH: ${order.measuredBy}</div>` : ''}
             </td>
             <td class="p-3">${blsRows}</td>
             <td class="p-3 font-bold text-slate-900 whitespace-nowrap">${order.totalWeight} T</td>
-            <td class="p-3 whitespace-nowrap">${dims}</td>
-            <td class="p-3 font-bold text-indigo-700 whitespace-nowrap">${order.vehicleType || '-'}</td>
             <td class="p-3">
               <span class="px-2 py-0.5 rounded-full text-xs font-bold ${badgeClass}">${statusEn}</span>
-              ${order.shareefNotes ? `<div class="text-xs text-slate-500 mt-1 italic max-w-xs">📝 ${order.shareefNotes}</div>` : ''}
             </td>
             <td class="p-3 text-center whitespace-nowrap">
               <button onclick="printFormalSlip('${order.id}')" class="bg-slate-800 hover:bg-black text-white px-2.5 py-1 rounded-lg text-xs font-bold shadow">🖨️ Print</button>
@@ -1038,8 +1050,6 @@
       const filtered = state.orders.filter(order => {
         const idMatch = order.id.toLowerCase().includes(query);
         const creatorMatch = (order.createdBy || '').toLowerCase().includes(query);
-        const vehMatch = (order.vehicleType || '').toLowerCase().includes(query);
-        const notesMatch = (order.shareefNotes || '').toLowerCase().includes(query);
         const blMatch = order.bls.some(b => 
           (b.blNumber || '').toLowerCase().includes(query) ||
           (b.alvSerial || '').toLowerCase().includes(query) ||
@@ -1047,7 +1057,7 @@
           (b.clearanceCompany || '').toLowerCase().includes(query)
         );
 
-        return idMatch || creatorMatch || vehMatch || notesMatch || blMatch;
+        return idMatch || creatorMatch || blMatch;
       });
 
       renderArchive(filtered);
@@ -1063,28 +1073,22 @@
             'التاريخ': formatDateEn(d),
             'الوقت': formatTime12(d),
             'منشئ الطلب': o.createdBy,
-            'موظف التحجيم': o.measuredBy || '-',
             'الحالة': o.status,
-            'نوع السيارة': o.vehicleType || '-',
             'البند': `بوليصة (${idx + 1})`,
             'رقم البوليصة (B/L)': b.blNumber,
-            'Bi8 Serial': b.alvSerial,
+            'الرقم التسلسلي': b.alvSerial,
             'العدد': b.qty,
             'الوزن (طن)': b.weight,
             'البلتات': b.pallets,
             'الموقع': b.location,
-            'شركة التخليص': b.clearanceCompany,
-            'الطول (م)': o.measurements?.length || '-',
-            'العرض (م)': o.measurements?.width || '-',
-            'الارتفاع (م)': o.measurements?.height || '-',
-            'ملاحظات موظف التحجيم': o.shareefNotes || '-'
+            'شركة التخليص': b.clearanceCompany
           });
         });
       });
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "أرشيف الطلبات");
-      XLSX.writeFile(wb, `ارشيف_طلبات_Bi8_${new Date().toISOString().slice(0,10)}.xlsx`);
+      XLSX.writeFile(wb, `ارشيف_التحجيم_${new Date().toISOString().slice(0,10)}.xlsx`);
     }
 
     async function cleanOldOrders(days) {
