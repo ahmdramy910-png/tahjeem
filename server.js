@@ -1,855 +1,295 @@
 const express = require('express');
-const cors = require('cors');
-const multer = require('multer');
 const mongoose = require('mongoose');
+const cors = require('cors');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const ExcelJS = require('exceljs');
+const OpenAI = require('openai');
 require('dotenv').config();
 
 const app = express();
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const JWT_SECRET = process.env.JWT_SECRET || 'tahjeem_secure_jwt_secret_key_2026';
 
-const upload = multer({
-  storage: multer.memoryStorage()
-});
-
+// Middlewares
 app.use(cors());
-
-app.use(
-  express.json({
-    limit: '25mb'
-  })
-);
-
+app.use(express.json({ limit: '25mb' }));
 app.use(express.static('public'));
 
-const MONGODB_URI = process.env.MONGODB_URI;
+// الاتصال بقاعدة بيانات MongoDB Atlas
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('Connected to MongoDB Atlas'))
+  .catch(err => console.error('MongoDB Connection Error:', err));
 
-const AppStateSchema = new mongoose.Schema(
-  {
-    key: {
-      type: String,
-      default: 'main_state',
-      unique: true
-    },
-    users: {
-      type: Array,
-      default: []
-    },
-    orders: {
-      type: Array,
-      default: []
-    }
-  },
-  {
-    timestamps: true
-  }
-);
+// 1. هياكل البيانات (Mongoose Schemas)
 
-const AppState = mongoose.model(
-  'AppState',
-  AppStateSchema
-);
+// هيكل المستخدمين وإدارة الأدوار
+const UserSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true, trim: true },
+  password: { type: String, required: true },
+  role: { type: String, enum: ['Admin', 'CustomerService', 'Warehouse'], default: 'Warehouse' },
+  fullName: String,
+  createdAt: { type: Date, default: Date.now }
+});
 
-let memoryState = {
-  users: [],
-  orders: []
+// هيكل سجل التحجيم والشحنات
+const ShipmentSchema = new mongoose.Schema({
+  blNumber: { type: String, required: true, trim: true },
+  voyageNumber: { type: String, trim: true },
+  consignee: { type: String, trim: true },
+  cargoDimensions: [{
+    length: Number,
+    width: Number,
+    height: Number,
+    pieces: { type: Number, default: 1 },
+    cbm: Number
+  }],
+  totalCBM: { type: Number, required: true },
+  totalPieces: { type: Number, default: 0 },
+  extractedFromOCR: { type: Boolean, default: false },
+  createdBy: { type: String, default: 'Warehouse User' },
+  createdAt: { type: Date, default: Date.now }
+});
+
+const User = mongoose.model('User', UserSchema);
+const Shipment = mongoose.model('Shipment', ShipmentSchema);
+
+// 2. التحقق من التوكن وصلاحيات المستخدم (Auth Middleware)
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ success: false, message: 'مطلوب تسجيل الدخول' });
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ success: false, message: 'جلسة الدخول غير صالحة' });
+    req.user = user;
+    next();
+  });
 };
 
-let isConnectedToMongo = false;
+// 3. مسارات المصادقة وتسجيل الدخول
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { username, password, role, fullName } = req.body;
+    const existing = await User.findOne({ username });
+    if (existing) return res.status(400).json({ success: false, message: 'اسم المستخدم مسجل مسبقاً' });
 
-
-/* =========================
-   MONGODB
-   ========================= */
-
-if (MONGODB_URI) {
-  mongoose
-    .connect(MONGODB_URI)
-    .then(async () => {
-      isConnectedToMongo = true;
-
-      console.log(
-        'Connected to MongoDB Atlas'
-      );
-
-      const doc = await AppState.findOne({
-        key: 'main_state'
-      });
-
-      if (!doc) {
-        await AppState.create({
-          key: 'main_state',
-          users: [],
-          orders: []
-        });
-      }
-    })
-    .catch(err => {
-      console.error(
-        'MongoDB error:',
-        err.message
-      );
-    });
-}
-
-
-async function loadDB() {
-  if (isConnectedToMongo) {
-    try {
-      const doc = await AppState.findOne({
-        key: 'main_state'
-      });
-
-      if (doc) {
-        return {
-          users: doc.users || [],
-          orders: doc.orders || []
-        };
-      }
-    } catch (err) {
-      console.error(
-        'Error loading DB:',
-        err
-      );
-    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = new User({ username, password: hashedPassword, role, fullName });
+    await user.save();
+    res.status(201).json({ success: true, message: 'تم إنشاء الحساب بنجاح' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
+});
 
-  return memoryState;
-}
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const user = await User.findOne({ username });
+    if (!user) return res.status(400).json({ success: false, message: 'بيانات الدخول غير صحيحة' });
 
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ success: false, message: 'بيانات الدخول غير صحيحة' });
 
-async function saveDB(data) {
-  memoryState = data;
+    const token = jwt.sign({ id: user._id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '12h' });
+    res.json({ success: true, token, user: { username: user.username, role: user.role, fullName: user.fullName } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
-  if (isConnectedToMongo) {
-    try {
-      await AppState.findOneAndUpdate(
+// 4. نقطة فحص OCR واستخراج بيانات شاشات Sage CRM عبر gpt-4o-mini
+app.post('/api/ocr-extract', async (req, res) => {
+  const { imageBase64 } = req.body;
+  if (!imageBase64) return res.status(400).json({ success: false, message: 'الصورة مطلوبة (Base64)' });
+
+  try {
+    const imageUrl = imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
         {
-          key: 'main_state'
+          role: "system",
+          content: "You are an expert OCR system specialized in extracting shipping logistics data from Sage CRM screenshots. Extract the B/L number, Voyage number, Consignee name, and Package Count accurately. Set missing text fields to empty strings and numeric fields to 0."
         },
         {
-          users: data.users,
-          orders: data.orders
-        },
-        {
-          upsert: true
+          role: "user",
+          content: [
+            { type: "text", text: "Extract B/L number, Voyage, Consignee, and Package count accurately from this Sage CRM screenshot." },
+            { type: "image_url", image_url: { url: imageUrl, detail: "high" } }
+          ]
         }
-      );
-    } catch (err) {
-      console.error(
-        'Error saving DB:',
-        err
-      );
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "sage_crm_extraction",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: {
+              blNumber: { type: "string", description: "The Bill of Lading (B/L) number" },
+              voyageNumber: { type: "string", description: "The Voyage number or vessel ID" },
+              consignee: { type: "string", description: "The consignee or client company name" },
+              packageCount: { type: "number", description: "Total number of packages or pieces" }
+            },
+            required: ["blNumber", "voyageNumber", "consignee", "packageCount"],
+            additionalProperties: false
+          }
+        }
+      }
+    });
+
+    const extractedData = JSON.parse(response.choices[0].message.content);
+    res.json({ success: true, data: extractedData });
+  } catch (error) {
+    console.error('OCR Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 5. مسارات التحجيم والشحنات
+app.post('/api/shipments', async (req, res) => {
+  try {
+    const { blNumber, voyageNumber, consignee, cargoDimensions, extractedFromOCR, createdBy } = req.body;
+
+    if (!blNumber) return res.status(400).json({ success: false, message: 'رقم البوليصة مطلوب' });
+
+    let calculatedTotalCBM = 0;
+    let calculatedTotalPieces = 0;
+
+    const dimensions = (cargoDimensions || []).map(dim => {
+      const l = Number(dim.length) || 0;
+      const w = Number(dim.width) || 0;
+      const h = Number(dim.height) || 0;
+      const pieces = Number(dim.pieces) || 1;
+      const cbm = parseFloat(((l * w * h / 1000000) * pieces).toFixed(3));
+
+      calculatedTotalCBM += cbm;
+      calculatedTotalPieces += pieces;
+
+      return { length: l, width: w, height: h, pieces, cbm };
+    });
+
+    const newShipment = new Shipment({
+      blNumber,
+      voyageNumber,
+      consignee,
+      cargoDimensions: dimensions,
+      totalCBM: parseFloat(calculatedTotalCBM.toFixed(3)),
+      totalPieces: calculatedTotalPieces,
+      extractedFromOCR: !!extractedFromOCR,
+      createdBy: createdBy || 'Warehouse User'
+    });
+
+    await newShipment.save();
+    res.status(201).json({ success: true, data: newShipment });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/shipments', async (req, res) => {
+  try {
+    const { blNumber, voyageNumber, startDate, endDate } = req.query;
+    let filter = {};
+
+    if (blNumber) filter.blNumber = { $regex: blNumber, $options: 'i' };
+    if (voyageNumber) filter.voyageNumber = { $regex: voyageNumber, $options: 'i' };
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate);
+      if (endDate) filter.createdAt.$lte = new Date(endDate);
     }
+
+    const shipments = await Shipment.find(filter).sort({ createdAt: -1 });
+    res.json({ success: true, count: shipments.length, data: shipments });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
-}
+});
 
+// 6. مسار تصدير السجلات إلى Excel
+app.get('/api/shipments/export', async (req, res) => {
+  try {
+    const shipments = await Shipment.find().sort({ createdAt: -1 });
 
-/* =========================
-   USERS
-   ========================= */
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('سجل التحجيم');
 
-app.get(
-  '/api/users/list',
-  async (req, res) => {
-    const db = await loadDB();
+    worksheet.columns = [
+      { header: 'رقم البوليصة (B/L)', key: 'blNumber', width: 20 },
+      { header: 'رقم الرحلة (Voyage)', key: 'voyageNumber', width: 15 },
+      { header: 'العميل (Consignee)', key: 'consignee', width: 30 },
+      { header: 'إجمالي القطع', key: 'totalPieces', width: 12 },
+      { header: 'إجمالي الحجم (CBM)', key: 'totalCBM', width: 18 },
+      { header: 'مستخرج بـ OCR', key: 'extractedFromOCR', width: 15 },
+      { header: 'الموظف', key: 'createdBy', width: 20 },
+      { header: 'تاريخ الإدخال', key: 'createdAt', width: 22 }
+    ];
 
-    res.json(
-      (db.users || []).map(u => ({
-        id: u.id,
-        name: u.name,
-        role: u.role
-      }))
-    );
-  }
-);
+    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0284C7' } };
 
-
-app.post(
-  '/api/login',
-  async (req, res) => {
-    const {
-      userId,
-      password
-    } = req.body;
-
-    const db = await loadDB();
-
-    const user = db.users.find(
-      u => u.id === userId
-    );
-
-    if (
-      !user ||
-      user.password !== password
-    ) {
-      return res.status(401).json({
-        error:
-          'Invalid user or password'
+    shipments.forEach(s => {
+      worksheet.addRow({
+        blNumber: s.blNumber,
+        voyageNumber: s.voyageNumber || '-',
+        consignee: s.consignee || '-',
+        totalPieces: s.totalPieces,
+        totalCBM: s.totalCBM,
+        extractedFromOCR: s.extractedFromOCR ? 'نعم' : 'لا',
+        createdBy: s.createdBy,
+        createdAt: s.createdAt.toLocaleString('ar-JO')
       });
-    }
-
-    res.json({
-      success: true,
-      user: {
-        id: user.id,
-        name: user.name,
-        role: user.role
-      }
-    });
-  }
-);
-
-
-app.post(
-  '/api/users/register',
-  async (req, res) => {
-    const {
-      name,
-      role,
-      password
-    } = req.body;
-
-    if (
-      !name ||
-      !password ||
-      password.length < 8
-    ) {
-      return res.status(400).json({
-        error:
-          'Password must be at least 8 characters'
-      });
-    }
-
-    const db = await loadDB();
-
-    if (
-      db.users.some(
-        u =>
-          u.name.toLowerCase() ===
-          name.trim().toLowerCase()
-      )
-    ) {
-      return res.status(400).json({
-        error:
-          'Employee already registered'
-      });
-    }
-
-    const newUser = {
-      id: 'u_' + Date.now(),
-      name: name.trim(),
-      role: role || 'cs',
-      password: password.trim()
-    };
-
-    db.users.push(newUser);
-
-    await saveDB(db);
-
-    res.json({
-      success: true,
-      user: {
-        id: newUser.id,
-        name: newUser.name,
-        role: newUser.role
-      }
-    });
-  }
-);
-
-
-/* =========================
-   DATA
-   ========================= */
-
-app.get(
-  '/api/data',
-  async (req, res) => {
-    const db = await loadDB();
-
-    res.json({
-      orders: db.orders
-    });
-  }
-);
-
-
-/* =========================
-   STATISTICS
-   ========================= */
-
-app.get(
-  '/api/stats',
-  async (req, res) => {
-    const db = await loadDB();
-
-    const stats = {};
-
-    (db.users || []).forEach(u => {
-      stats[u.name] = {
-        role:
-          u.role === 'cs'
-            ? 'Customer Service'
-            : 'Warehouse',
-        totalBLs: 0,
-        totalCars: 0
-      };
     });
 
-    (db.orders || []).forEach(order => {
-      const blCount =
-        (order.bls || []).length;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=Tahjeem_Shipments.xlsx');
 
-      if (!blCount) {
-        return;
-      }
-
-      if (order.createdBy) {
-        if (!stats[order.createdBy]) {
-          stats[order.createdBy] = {
-            role: 'CS',
-            totalBLs: 0,
-            totalCars: 0
-          };
-        }
-
-        stats[
-          order.createdBy
-        ].totalBLs += blCount;
-
-        stats[
-          order.createdBy
-        ].totalCars += 1;
-      }
-
-      if (
-        order.measuredBy &&
-        order.measuredBy !== order.createdBy &&
-        order.status === 'تم التحجيم'
-      ) {
-        if (!stats[order.measuredBy]) {
-          stats[order.measuredBy] = {
-            role: 'Warehouse',
-            totalBLs: 0,
-            totalCars: 0
-          };
-        }
-
-        stats[
-          order.measuredBy
-        ].totalBLs += blCount;
-
-        stats[
-          order.measuredBy
-        ].totalCars += 1;
-      }
-    });
-
-    res.json(stats);
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
-);
+});
 
-
-/* =========================
-   OCR - OLLAMA
-   ========================= */
-
-app.post(
-  '/api/ocr',
-  upload.single('image'),
-  async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({
-          error: 'No image provided'
-        });
-      }
-
-      const base64Data =
-        req.file.buffer.toString('base64');
-
-      const prompt = `
-You are a highly accurate OCR system for a logistics company.
-
-Read the provided Sage CRM screenshot carefully.
-
-Extract ONLY these fields:
-
-{
-  "blNumber": "",
-  "alvSerial": "",
-  "qty": "",
-  "weight": "",
-  "pallets": "",
-  "location": "",
-  "clearanceCompany": ""
-}
-
-Return ONLY a valid JSON object.
-
-Do not write explanations.
-Do not use markdown.
-Do not add extra fields.
-
-IMPORTANT RULES:
-
-1. B/L NUMBER
-Read the B/L number exactly as shown.
-
-A numeric zero must always be written as:
-0
-
-Never replace digit 0 with letter O.
-
-2. ALV SERIAL
-Read the ALV serial exactly as shown.
-
-A numeric zero must always be:
-0
-
-Never replace numeric 0 with letter O.
-
-3. QTY
-Return quantity as a pure integer.
-
-Example:
-55
-
-Do not return:
-55 pcs
-
-4. WEIGHT
-Read the weight in tons.
-
-Round UP to the nearest 0.1 ton.
-
-Examples:
-
-1.611 -> 1.7
-2.01 -> 2.1
-3.20 -> 3.2
-
-5. PALLETS
-Return pallets as a pure integer.
-
-6. LOCATION
-Read the warehouse location code accurately.
-
-7. CLEARANCE COMPANY
-Transcribe the clearance company name accurately.
-
-8. DO NOT GUESS
-If a field cannot be read clearly, return an empty string.
-
-9. DO NOT INVENT DATA
-Never create information that is not visible in the image.
-
-10. PRESERVE ORIGINAL VALUES
-Keep the original value whenever possible.
-
-Return ONLY the JSON object.
-`;
-
-      const ollamaUrl =
-        'https://requirements-thy-aspects-guns.trycloudflare.com/api/chat';
-
-      const response = await fetch(
-        ollamaUrl,
-        {
-          method: 'POST',
-
-          headers: {
-            'Content-Type':
-              'application/json'
-          },
-
-          body: JSON.stringify({
-            model: 'qwen2.5vl:7b',
-
-            messages: [
-              {
-                role: 'user',
-                content: prompt,
-                images: [base64Data]
-              }
-            ],
-
-            stream: false,
-
-            format: 'json',
-
-            options: {
-              temperature: 0
-            }
-          })
+// 7. مسار مؤشرات الأداء والإنتاجية (KPIs)
+app.get('/api/kpi/summary', async (req, res) => {
+  try {
+    const totalShipments = await Shipment.countDocuments();
+    const totalPiecesAgg = await Shipment.aggregate([{ $group: { _id: null, total: { $sum: '$totalPieces' }, totalCBM: { $sum: '$totalCBM' } } }]);
+    
+    // إحصائيات لكل موظف
+    const userStats = await Shipment.aggregate([
+      {
+        $group: {
+          _id: '$createdBy',
+          shipmentsCount: { $sum: 1 },
+          piecesCount: { $sum: '$totalPieces' },
+          totalCBM: { $sum: '$totalCBM' }
         }
-      );
-
-
-      const responseText =
-        await response.text();
-
-
-      if (!response.ok) {
-        console.error(
-          'Ollama HTTP Error:',
-          response.status,
-          responseText
-        );
-
-        return res.status(500).json({
-          error:
-            'Ollama HTTP Error ' +
-            response.status +
-            ': ' +
-            responseText
-        });
-      }
-
-
-      if (!responseText.trim()) {
-        console.error(
-          'Ollama returned an empty response'
-        );
-
-        return res.status(500).json({
-          error:
-            'Ollama returned an empty response'
-        });
-      }
-
-
-      let data;
-
-      try {
-        data =
-          JSON.parse(responseText);
-      } catch (err) {
-        console.error(
-          'Invalid Ollama response:',
-          responseText
-        );
-
-        return res.status(500).json({
-          error:
-            'Invalid response from Ollama'
-        });
-      }
-
-
-      const rawContent =
-        data.message?.content || '';
-
-
-      if (!rawContent.trim()) {
-        console.error(
-          'Ollama returned empty message content'
-        );
-
-        return res.status(500).json({
-          error:
-            'Ollama returned empty OCR result'
-        });
-      }
-
-
-      let parsed;
-
-      try {
-        parsed =
-          JSON.parse(rawContent);
-      } catch (err) {
-        console.error(
-          'Invalid OCR JSON:',
-          rawContent
-        );
-
-        return res.status(500).json({
-          error:
-            'OCR returned invalid JSON'
-        });
-      }
-
-
-      const result = {
-        blNumber:
-          String(
-            parsed.blNumber || ''
-          ).trim(),
-
-        alvSerial:
-          String(
-            parsed.alvSerial || ''
-          ).trim(),
-
-        qty:
-          String(
-            parsed.qty || ''
-          ).trim(),
-
-        weight:
-          String(
-            parsed.weight || ''
-          ).trim(),
-
-        pallets:
-          String(
-            parsed.pallets || ''
-          ).trim(),
-
-        location:
-          String(
-            parsed.location || ''
-          ).trim(),
-
-        clearanceCompany:
-          String(
-            parsed.clearanceCompany || ''
-          ).trim()
-      };
-
-
-      /* =========================
-         CLEAN QTY
-         ========================= */
-
-      if (result.qty) {
-        const cleanQty =
-          parseInt(
-            result.qty.replace(/,/g, ''),
-            10
-          );
-
-        if (!isNaN(cleanQty)) {
-          result.qty =
-            String(cleanQty);
-        }
-      }
-
-
-      /* =========================
-         CLEAN PALLETS
-         ========================= */
-
-      if (result.pallets) {
-        const cleanPallets =
-          parseInt(
-            result.pallets.replace(/,/g, ''),
-            10
-          );
-
-        if (!isNaN(cleanPallets)) {
-          result.pallets =
-            String(cleanPallets);
-        }
-      }
-
-
-      return res.json(result);
-
-    } catch (err) {
-      console.error(
-        'OCR Endpoint Error:',
-        err
-      );
-
-      return res.status(500).json({
-        error:
-          'Server Error: ' +
-          err.message
-      });
-    }
-  }
-);
-
-
-/* =========================
-   CREATE ORDER
-   ========================= */
-
-app.post(
-  '/api/orders',
-  async (req, res) => {
-    const db = await loadDB();
-
-    const newOrder = {
-      id:
-        'ORD-' +
-        Math.floor(
-          100000 +
-          Math.random() * 900000
-        ),
-
-      createdAt:
-        new Date().toISOString(),
-
-      createdBy:
-        req.body.createdBy ||
-        'Customer Service',
-
-      status:
-        req.body.isManual
-          ? 'طباعة يدوية'
-          : 'بانتظار التحجيم',
-
-      isManualPrint:
-        !!req.body.isManual,
-
-      bls:
-        req.body.bls || [],
-
-      totalWeight:
-        req.body.totalWeight || 0,
-
-      measurements: {
-        length: '',
-        width: '',
-        height: ''
       },
-
-      vehicleType: '',
-
-      shareefNotes:
-        req.body.shareefNotes || '',
-
-      measuredBy:
-        null,
-
-      completedAt:
-        req.body.isManual
-          ? new Date().toISOString()
-          : null
-    };
-
-    db.orders.unshift(newOrder);
-
-    await saveDB(db);
-
-    res.json(newOrder);
-  }
-);
-
-
-/* =========================
-   TAHJEEM
-   ========================= */
-
-app.patch(
-  '/api/orders/:id/tahjeem',
-  async (req, res) => {
-    const db = await loadDB();
-
-    const order =
-      db.orders.find(
-        o => o.id === req.params.id
-      );
-
-    if (!order) {
-      return res.status(404).json({
-        error:
-          'Order not found'
-      });
-    }
-
-    order.measurements =
-      req.body.measurements;
-
-    order.vehicleType =
-      req.body.vehicleType || '';
-
-    order.shareefNotes =
-      req.body.shareefNotes || '';
-
-    order.measuredBy =
-      req.body.measuredBy ||
-      'Warehouse Staff';
-
-    order.status =
-      'تم التحجيم';
-
-    order.completedAt =
-      new Date().toISOString();
-
-    await saveDB(db);
-
-    res.json(order);
-  }
-);
-
-
-/* =========================
-   CLEAN OLD ORDERS
-   ========================= */
-
-app.delete(
-  '/api/orders/clean',
-  async (req, res) => {
-    const days =
-      parseInt(req.query.days) || 7;
-
-    const db = await loadDB();
-
-    const cutoff =
-      new Date(
-        Date.now() -
-        days *
-        24 *
-        60 *
-        60 *
-        1000
-      );
-
-    db.orders =
-      db.orders.filter(
-        o =>
-          new Date(o.createdAt) >=
-          cutoff
-      );
-
-    await saveDB(db);
+      { $sort: { shipmentsCount: -1 } }
+    ]);
 
     res.json({
       success: true,
-      count:
-        db.orders.length
+      data: {
+        totalShipments,
+        totalPieces: totalPiecesAgg[0] ? totalPiecesAgg[0].total : 0,
+        totalCBM: totalPiecesAgg[0] ? parseFloat(totalPiecesAgg[0].totalCBM.toFixed(3)) : 0,
+        userPerformance: userStats
+      }
     });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
-);
+});
 
-
-/* =========================
-   CLEAR ALL ORDERS
-   ========================= */
-
-app.delete(
-  '/api/orders/clear-all',
-  async (req, res) => {
-    const db = await loadDB();
-
-    db.orders = [];
-
-    await saveDB(db);
-
-    res.json({
-      success: true,
-      message:
-        'Archive cleared'
-    });
-  }
-);
-
-
-/* =========================
-   START SERVER
-   ========================= */
-
-const PORT =
-  process.env.PORT || 10000;
-
-app.listen(
-  PORT,
-  () => {
-    console.log(
-      `Server running on port ${PORT}`
-    );
-  }
-);
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Tahjeem server running on port ${PORT}`);
+});
