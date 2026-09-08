@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tahjeem ALV - Aqaba Logistics Village</title>
+  <title>Tahjeem Bi8 - Logistics Operations</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Cairo:wght@600;700;800;900&display=swap" rel="stylesheet">
@@ -21,11 +21,11 @@
     <div class="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full border border-slate-200 text-center space-y-5">
       
       <div class="space-y-1">
-        <div class="w-16 h-16 bg-blue-900 text-white rounded-2xl flex items-center justify-center mx-auto text-2xl font-black shadow-lg tracking-wider">
-          ALV
+        <div class="w-16 h-16 bg-blue-900 text-amber-400 rounded-2xl flex items-center justify-center mx-auto text-2xl font-black shadow-lg tracking-wider border-2 border-amber-400/30">
+          Bi8
         </div>
-        <h2 class="text-2xl font-black text-blue-950 pt-2 tracking-tight">Tahjeem ALV</h2>
-        <p class="text-xs text-slate-500 font-semibold">Aqaba Logistics Village • LCL Operations</p>
+        <h2 class="text-2xl font-black text-blue-950 pt-2 tracking-tight">Tahjeem Bi8</h2>
+        <p class="text-xs text-slate-500 font-semibold">Logistics Systems • LCL Operations</p>
       </div>
 
       <div class="grid grid-cols-2 p-1 bg-slate-100 rounded-xl text-xs sm:text-sm font-bold">
@@ -82,8 +82,8 @@
 
       <div id="authError" class="text-rose-600 text-xs font-bold hidden bg-rose-50 p-2.5 rounded-lg border border-rose-200"></div>
 
-      <div class="pt-2 text-[11px] text-slate-400 border-t">
-        Tahjeem ALV Digital Platform © 2026
+      <div class="pt-2 text-[11px] text-slate-400 border-t font-semibold">
+        Bi8 Digital Platform © 2026
       </div>
     </div>
   </div>
@@ -93,10 +93,10 @@
     <nav class="bg-blue-900 text-white shadow-md sticky top-0 z-40">
       <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
         <div class="flex items-center space-x-3">
-          <span class="text-xl font-black bg-blue-800 px-2.5 py-1 rounded-lg tracking-wider">ALV</span>
+          <span class="text-xl font-black bg-blue-950 text-amber-400 px-2.5 py-1 rounded-lg tracking-wider border border-amber-400/40">Bi8</span>
           <div>
-            <h1 class="text-lg font-black leading-none tracking-wide">Tahjeem ALV</h1>
-            <span class="text-[11px] text-blue-200">Aqaba Logistics Village</span>
+            <h1 class="text-lg font-black leading-none tracking-wide">Tahjeem Bi8</h1>
+            <span class="text-[11px] text-blue-200">Logistics Automation Systems</span>
           </div>
         </div>
         <div class="flex items-center space-x-4 text-sm">
@@ -632,6 +632,7 @@
       calcTotalWeight();
     }
 
+    // ورقة الطباعة الرسمية بعلامة Bi8 التجارية
     function printFormalSlip(orderId) {
       let clearanceCompany = '';
       let dateStr = '';
@@ -671,12 +672,13 @@
       printWindow.document.write(`
         <html dir="rtl">
         <head>
-          <title>خدمة تحجيم - Aqaba Logistics Village</title>
+          <title>خدمة تحجيم - Bi8 Logistics</title>
           <style>
             @page { size: A4 portrait; margin: 12mm; }
             body { font-family: 'Cairo', Tahoma, Arial, sans-serif; padding: 10px; color: #000; line-height: 1.5; font-size: 16px; }
+            .header-badge { display: inline-block; background: #000; color: #fff; padding: 3px 12px; border-radius: 6px; font-weight: 900; font-size: 20px; letter-spacing: 1px; margin-bottom: 4px; }
             .header-title { text-align: center; font-size: 24px; font-weight: 900; margin-bottom: 2px; }
-            .sub-title { text-align: center; font-size: 20px; font-weight: 700; margin-bottom: 22px; color: #222; }
+            .sub-title { text-align: center; font-size: 19px; font-weight: 700; margin-bottom: 22px; color: #222; }
             .top-info { display: flex; justify-content: space-between; margin-bottom: 18px; font-size: 17px; font-weight: 600; }
             table { width: 100%; border-collapse: collapse; margin-bottom: 22px; }
             th, td { border: 2px solid #000; padding: 9px 6px; text-align: center; font-size: 16px; }
@@ -690,8 +692,11 @@
           </style>
         </head>
         <body>
-          <div class="header-title font-en">Aqaba Logistics Village (ALV)</div>
-          <div class="sub-title">خدمة تحجيم الشحنات (LCL)</div>
+          <div style="text-align: center;">
+            <div class="header-badge font-en">Bi8</div>
+            <div class="header-title font-en">Bi8 Logistics Solutions</div>
+            <div class="sub-title">خدمة تحجيم وخروج الشحنات (LCL)</div>
+          </div>
 
           <div class="top-info">
             <div><b>شركة التخليص:</b> <u>&nbsp;${clearanceCompany || '_______________________'}&nbsp;</u></div>
@@ -703,7 +708,7 @@
               <tr>
                 <th style="width: 18%;">البند</th>
                 <th style="width: 24%;">رقم البوليصة (B/L No)</th>
-                <th style="width: 14%;">ALV</th>
+                <th style="width: 14%;">الرقم التسلسلي</th>
                 <th style="width: 12%;">الوزن/طن</th>
                 <th style="width: 10%;">العدد</th>
                 <th style="width: 10%;">البلتات</th>
@@ -848,7 +853,7 @@
               <div class="bg-white p-3 rounded-xl border text-xs shadow-sm space-y-1">
                 <div class="flex justify-between items-center border-b pb-1">
                   <div><span class="text-slate-500">B/L (${idx + 1}):</span> <b class="text-blue-900 font-mono text-sm">${b.blNumber}</b></div>
-                  <div class="bg-blue-100 text-blue-900 px-2 py-0.5 rounded font-mono font-bold">ALV: ${b.alvSerial || '-'}</div>
+                  <div class="bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-mono font-bold">Bi8: ${b.alvSerial || '-'}</div>
                 </div>
                 <div class="grid grid-cols-4 gap-2 pt-1 font-semibold">
                   <div>Location: <b class="text-rose-600 bg-rose-50 px-1 rounded">${b.location || 'N/A'}</b></div>
@@ -982,7 +987,7 @@
         const blsRows = order.bls.map((b, i) => `
           <div class="mb-1 pb-1 border-b border-slate-100 last:border-0 text-xs">
             <b class="text-blue-950 font-mono">B/L (${i+1}): ${b.blNumber}</b> 
-            | <span class="text-slate-500 font-mono">ALV: ${b.alvSerial || '-'}</span>
+            | <span class="text-amber-700 font-mono font-bold">Bi8: ${b.alvSerial || '-'}</span>
             | <span class="text-rose-600 font-bold">${b.location || '-'}</span>
             ${b.clearanceCompany ? `| <span class="text-slate-600 font-semibold">${b.clearanceCompany}</span>` : ''}
           </div>
@@ -1063,7 +1068,7 @@
             'نوع السيارة': o.vehicleType || '-',
             'البند': `بوليصة (${idx + 1})`,
             'رقم البوليصة (B/L)': b.blNumber,
-            'ALV Serial': b.alvSerial,
+            'Bi8 Serial': b.alvSerial,
             'العدد': b.qty,
             'الوزن (طن)': b.weight,
             'البلتات': b.pallets,
@@ -1079,7 +1084,7 @@
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "أرشيف الطلبات");
-      XLSX.writeFile(wb, `ارشيف_طلبات_التحجيم_${new Date().toISOString().slice(0,10)}.xlsx`);
+      XLSX.writeFile(wb, `ارشيف_طلبات_Bi8_${new Date().toISOString().slice(0,10)}.xlsx`);
     }
 
     async function cleanOldOrders(days) {
