@@ -2,17 +2,17 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const mongoose = require('mongoose');
-const path = require('path');
+const OpenAI = require('openai');
 require('dotenv').config();
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 app.use(cors());
 app.use(express.json({ limit: '25mb' }));
 app.use(express.static('public'));
 
-// --- MongoDB Atlas Connection ---
 const MONGODB_URI = process.env.MONGODB_URI;
 
 const AppStateSchema = new mongoose.Schema({
@@ -64,59 +64,30 @@ async function saveDB(data) {
   }
 }
 
-// دالة مساعدة لتحديد تاريخ ويوم الشفت (من 8 صباحاً إلى 4 عصراً)
-function getShiftInfo(isoDateString) {
-  const d = new Date(isoDateString);
-  // تحويل التوقيت إلى توقيت الأردن (+3)
-  const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
-  const jordanTime = new Date(utc + (3600000 * 3));
-
-  const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-  const dayName = days[jordanTime.getDay()];
-  
-  const yyyy = jordanTime.getFullYear();
-  const mm = String(jordanTime.getMonth() + 1).padStart(2, '0');
-  const dd = String(jordanTime.getDate()).padStart(2, '0');
-  const dateKey = `${yyyy}-${mm}-${dd}`;
-
-  const hour = jordanTime.getHours();
-  // الدوام الرسمي: 8 صباحاً لغاية 4 عصراً (8:00 إلى 15:59:59)
-  const isWithinShift = (hour >= 8 && hour < 16);
-
-  return {
-    dateKey,
-    dayName,
-    isWithinShift,
-    formattedDate: `${dayName} (${dateKey})`
-  };
-}
-
-// 1. Users List
+// مسارات المستخدمين والمصادقة
 app.get('/api/users/list', async (req, res) => {
   const db = await loadDB();
   res.json((db.users || []).map(u => ({ id: u.id, name: u.name, role: u.role })));
 });
 
-// 2. Login
 app.post('/api/login', async (req, res) => {
   const { userId, password } = req.body;
   const db = await loadDB();
   const user = db.users.find(u => u.id === userId);
   if (!user || user.password !== password) {
-    return res.status(401).json({ error: 'كلمة المرور أو اسم المستخدم غير صحيح' });
+    return res.status(401).json({ error: 'Invalid user or password' });
   }
   res.json({ success: true, user: { id: user.id, name: user.name, role: user.role } });
 });
 
-// 3. Register
 app.post('/api/users/register', async (req, res) => {
   const { name, role, password } = req.body;
   if (!name || !password || password.length < 8) {
-    return res.status(400).json({ error: 'كلمة المرور يجب أن لا تقل عن 8 خانات' });
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
   }
   const db = await loadDB();
   if (db.users.some(u => u.name.toLowerCase() === name.trim().toLowerCase())) {
-    return res.status(400).json({ error: 'اسم الموظف مسجل مسبقاً' });
+    return res.status(400).json({ error: 'Employee already registered' });
   }
   const newUser = { id: 'u_' + Date.now(), name: name.trim(), role: role || 'cs', password: password.trim() };
   db.users.push(newUser);
@@ -124,142 +95,97 @@ app.post('/api/users/register', async (req, res) => {
   res.json({ success: true, user: { id: newUser.id, name: newUser.name, role: newUser.role } });
 });
 
-// 4. Get Orders
 app.get('/api/data', async (req, res) => {
   const db = await loadDB();
   res.json({ orders: db.orders });
 });
 
-// 5. إحصائيات مفصلة يوم بيوم مع وقت الدوام (8 ص - 4 ع)
+// مؤشرات الأداء والإنتاجية (KPIs)
 app.get('/api/stats', async (req, res) => {
   const db = await loadDB();
-  const dailyReport = {};
-
+  const stats = {};
+  (db.users || []).forEach(u => {
+    stats[u.name] = { role: u.role === 'cs' ? 'Customer Service' : 'Warehouse', totalBLs: 0, totalCars: 0 };
+  });
   (db.orders || []).forEach(order => {
     const blCount = (order.bls || []).length;
-    if (blCount === 0) return;
-
-    const shift = getShiftInfo(order.createdAt || new Date());
-    const dateKey = shift.dateKey;
-
-    if (!dailyReport[dateKey]) {
-      dailyReport[dateKey] = {
-        date: dateKey,
-        dayName: shift.dayName,
-        label: shift.formattedDate,
-        employees: {}
-      };
+    if (!blCount) return;
+    if (order.createdBy) {
+      if (!stats[order.createdBy]) stats[order.createdBy] = { role: 'CS', totalBLs: 0, totalCars: 0 };
+      stats[order.createdBy].totalBLs += blCount;
+      stats[order.createdBy].totalCars += 1;
     }
-
-    // إحصائية موظف خدمة العملاء
-    const creator = order.createdBy;
-    if (creator) {
-      if (!dailyReport[dateKey].employees[creator]) {
-        dailyReport[dateKey].employees[creator] = {
-          name: creator,
-          role: 'خدمة العملاء (CS)',
-          shiftBLs: 0,
-          shiftCars: 0,
-          afterHoursBLs: 0,
-          totalBLs: 0,
-          totalCars: 0
-        };
-      }
-      const emp = dailyReport[dateKey].employees[creator];
-      emp.totalBLs += blCount;
-      emp.totalCars += 1;
-      if (shift.isWithinShift) {
-        emp.shiftBLs += blCount;
-        emp.shiftCars += 1;
-      } else {
-        emp.afterHoursBLs += blCount;
-      }
-    }
-
-    // إحصائية موظف المستودع / الساحة
-    const measurer = order.measuredBy;
-    if (measurer && measurer !== creator && order.status === 'تم التحجيم') {
-      if (!dailyReport[dateKey].employees[measurer]) {
-        dailyReport[dateKey].employees[measurer] = {
-          name: measurer,
-          role: 'الساحة والمستودع',
-          shiftBLs: 0,
-          shiftCars: 0,
-          afterHoursBLs: 0,
-          totalBLs: 0,
-          totalCars: 0
-        };
-      }
-      const emp = dailyReport[dateKey].employees[measurer];
-      emp.totalBLs += blCount;
-      emp.totalCars += 1;
-      if (shift.isWithinShift) {
-        emp.shiftBLs += blCount;
-        emp.shiftCars += 1;
-      } else {
-        emp.afterHoursBLs += blCount;
-      }
+    if (order.measuredBy && order.measuredBy !== order.createdBy && order.status === 'تم التحجيم') {
+      if (!stats[order.measuredBy]) stats[order.measuredBy] = { role: 'Warehouse', totalBLs: 0, totalCars: 0 };
+      stats[order.measuredBy].totalBLs += blCount;
+      stats[order.measuredBy].totalCars += 1;
     }
   });
-
-  res.json(dailyReport);
+  res.json(stats);
 });
 
-// 6. OCR using GitHub Models (GPT-4o)
+// نقطة فحص الـ OCR عبر gpt-4o-mini مع Structured Outputs
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'لم يتم إرسال أي صورة' });
+    if (!req.file) return res.status(400).json({ error: 'No image provided' });
 
-    const token = process.env.ai_yahjeem;
-    if (!token) return res.status(500).json({ error: 'ai_yahjeem غير معرف في Render' });
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({ error: 'OPENAI_API_KEY variable is missing in Render Environment' });
+    }
 
     const base64Data = req.file.buffer.toString('base64');
     const mimeType = req.file.mimetype || 'image/png';
     const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
     const prompt = `Logistics OCR task for Sage CRM window.
-Extract the logistics values accurately. Respond ONLY with a valid JSON object. No preamble, no backticks.
-
+Extract the logistics values accurately.
 RULES:
 1. Alphanumerics: Serial numbers and B/L identifiers always contain the DIGIT '0', NOT letter 'O'.
-2. Quantity (qty): Extract as pure integer (e.g. 55).
-3. Weight: Rounded UP to the nearest 0.1 ton (e.g. 1.611 -> 1.7).
+2. Quantity (qty): Extract as pure integer string (e.g. "55").
+3. Weight: Rounded UP to the nearest 0.1 ton (e.g. 1.611 -> "1.7").
 4. Accurately transcribe clearance company name and warehouse location code.
+If any field is missing, set its value to an empty string "".`;
 
-Output strictly:
-{"blNumber":"","alvSerial":"","qty":"","weight":"","pallets":"","location":"","clearanceCompany":""}`;
-
-    const response = await fetch('https://models.github.ai/inference/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token.trim()}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: prompt },
-              { type: 'image_url', image_url: { url: dataUrl } }
-            ]
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert OCR assistant for logistics systems. Strict JSON output required."
+        },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            { type: "image_url", image_url: { url: dataUrl, detail: "high" } }
+          ]
+        }
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "sage_crm_fields",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: {
+              blNumber: { type: "string", description: "B/L identifier" },
+              alvSerial: { type: "string", description: "ALV Serial number" },
+              qty: { type: "string", description: "Quantity of packages" },
+              weight: { type: "string", description: "Weight rounded up to 0.1 ton" },
+              pallets: { type: "string", description: "Number of pallets" },
+              location: { type: "string", description: "Warehouse location code" },
+              clearanceCompany: { type: "string", description: "Clearance company name" }
+            },
+            required: ["blNumber", "alvSerial", "qty", "weight", "pallets", "location", "clearanceCompany"],
+            additionalProperties: false
           }
-        ],
-        temperature: 0.0,
-        response_format: { type: "json_object" }
-      })
+        }
+      },
+      temperature: 0.0
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error('GitHub Models API Error:', data);
-      return res.status(response.status).json({ error: data.error?.message || 'خطأ في استجابة خدمة GitHub Models' });
-    }
-
-    const rawContent = data.choices?.[0]?.message?.content || '{}';
-    const parsed = JSON.parse(rawContent);
+    const parsed = JSON.parse(completion.choices[0].message.content);
 
     if (parsed.qty) {
       const cleanQty = parseInt(String(parsed.qty).replace(/,/g, ''), 10);
@@ -278,7 +204,7 @@ Output strictly:
   }
 });
 
-// 7. إنشاء طلب جديد
+// إدارة الطلبات والتحجيم
 app.post('/api/orders', async (req, res) => {
   const db = await loadDB();
   const newOrder = {
@@ -300,7 +226,6 @@ app.post('/api/orders', async (req, res) => {
   res.json(newOrder);
 });
 
-// 8. حفظ التحجيم
 app.patch('/api/orders/:id/tahjeem', async (req, res) => {
   const db = await loadDB();
   const order = db.orders.find(o => o.id === req.params.id);
@@ -317,7 +242,6 @@ app.patch('/api/orders/:id/tahjeem', async (req, res) => {
   res.json(order);
 });
 
-// 9. تنظيف الطلبات القديمة
 app.delete('/api/orders/clean', async (req, res) => {
   const days = parseInt(req.query.days) || 7;
   const db = await loadDB();
@@ -327,7 +251,6 @@ app.delete('/api/orders/clean', async (req, res) => {
   res.json({ success: true, count: db.orders.length });
 });
 
-// 10. تفريغ الأرشيف
 app.delete('/api/orders/clear-all', async (req, res) => {
   const db = await loadDB();
   db.orders = [];
@@ -336,4 +259,4 @@ app.delete('/api/orders/clear-all', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Tahjeem ALV server running on port ${PORT}`));
