@@ -150,7 +150,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// نقطة فحص الـ OCR المضبوطة بالكامل على واجهة Sage CRM
+// محرك فحص الـ OCR المضبوط بدقة لحقل اسم الشركة
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image provided' });
@@ -163,21 +163,21 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
     const mimeType = req.file.mimetype || 'image/png';
     const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
-    const prompt = `Logistics OCR extraction mapped specifically to this Sage CRM interface:
-1. blNumber: Extract the exact text right next to 'B\\L No:' (e.g., 'M26EXL24052JOAQB'). Retain full characters verbatim without skipping any letter or digit.
-2. alvSerial: Extract the full string right under or next to 'ALV Serial:' preserving spaces (e.g., 'ALV149 08 2026').
-3. pallets: Extract the exact number directly below the label 'ALV Pallet:' (e.g., '4'). Do NOT ignore this field.
-4. qty: Extract the exact number under 'QTY:' (e.g., '4.0000').
-5. weight: Extract the exact raw number under 'Weight(Ton):' (e.g., '2.8400').
-6. clearanceCompany: Extract the company name written next to 'Company clearance:' (e.g., 'ARAB AMIRCAN CO ARAMEX'). Do NOT include any phone numbers.
-7. locations: Look at the bottom table titled 'B\\L Location'. Extract all unique codes listed under the 'Location' column (e.g. if all rows say 'M1', return ["M1"]. If rows have 'M1' and 'B3', return ["M1", "B3"]).`;
+    const prompt = `Logistics OCR extraction for Sage CRM:
+1. blNumber: Extract the exact string right next to 'B\\L No:'.
+2. alvSerial: Extract the full string under 'ALV Serial:' preserving spaces (e.g. 'ALV149 08 2026').
+3. pallets: Extract the exact number directly below 'ALV Pallet:' (e.g. '4').
+4. qty: Extract the exact number under 'QTY:' (e.g. '4.0000').
+5. weight: Extract the exact raw number under 'Weight(Ton):' (e.g. '2.8400').
+6. clearanceCompany: Locate 'Company clearance:'. Extract ONLY the company text name (e.g. 'ARAB AMIRCAN CO ARAMEX'). STOP before any telephone icon, pager, or phone number digits (like 6374242). Transcribe the company text verbatim character-for-character as printed, without spell-checking or changing any letters.
+7. locations: Look at the table 'B\\L Location' at the bottom. Extract all unique values from the 'Location' column.`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: "You are a precise data extractor for Sage CRM logistics screenshots. Map the exact labeled UI elements to JSON."
+          content: "You are a specialized OCR parser for Sage CRM screenshots. Transcribe visual text verbatim into JSON."
         },
         {
           role: "user",
@@ -200,11 +200,11 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
               pallets: { type: "string", description: "Number under ALV Pallet:" },
               qty: { type: "string", description: "Number under QTY:" },
               weight: { type: "string", description: "Number under Weight(Ton):" },
-              clearanceCompany: { type: "string", description: "Company name beside Company clearance:" },
+              clearanceCompany: { type: "string", description: "Company name text only beside Company clearance:" },
               locations: { 
                 type: "array", 
                 items: { type: "string" }, 
-                description: "List of unique locations in B\\L Location table" 
+                description: "List of unique locations from B\\L Location table" 
               }
             },
             required: ["blNumber", "alvSerial", "pallets", "qty", "weight", "clearanceCompany", "locations"],
@@ -230,9 +230,12 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
       cleanPallets = !isNaN(p) ? String(Math.floor(p)) : String(parsed.pallets).trim();
     }
 
-    // 2. تصفية اسم شركة التخليص برمجياً من أرقام الهواتف
-    let cleanCompany = (parsed.clearanceCompany || '')
-      .replace(/(?:tel|phone|mob|fax|هاتف|تلفون|خلوي|فاكس)?[:\s]*\+?\d[\d\s\-\/]{6,}\d/gi, '')
+    // 2. تنظيف اسم شركة التخليص بدقة (حذف أي أرقام ملحقة بالاسم في النهاية)
+    let cleanCompany = (parsed.clearanceCompany || '').trim();
+    // إزالة أي أرقام هواتف أو رموز في نهاية النص
+    cleanCompany = cleanCompany
+      .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|\u260E|\u2706|\u2121/g, '') // إزالة رموز الهاتف الإيموجي
+      .replace(/\s+\d{4,}\b.*$/, '') // إزالة أي رقم هاتف متصل بنهاية الاسم
       .replace(/\s+/g, ' ')
       .trim();
 
@@ -243,7 +246,7 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
       if (match) {
         let num = parseFloat(match[0]);
         if (!isNaN(num) && num > 0) {
-          if (num > 50) num = num / 1000; // في حال كان مسجلاً كغم
+          if (num > 50) num = num / 1000;
           finalWeight = (Math.ceil(parseFloat(num.toFixed(5)) * 10) / 10).toFixed(1);
         } else {
           finalWeight = match[0];
@@ -251,7 +254,7 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
       }
     }
 
-    // 4. دمج المواقع المتعددة بعلامة + مع إزالة التكرار
+    // 4. دمج المواقع المتعددة بعلامة +
     let finalLocation = '';
     if (Array.isArray(parsed.locations) && parsed.locations.length > 0) {
       const uniqueLocs = [...new Set(parsed.locations.map(l => String(l).trim()).filter(Boolean))];
