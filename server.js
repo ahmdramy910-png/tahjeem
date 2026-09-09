@@ -64,7 +64,7 @@ async function saveDB(data) {
   }
 }
 
-// مسارات المستخدمين
+// مسارات المستخدمين وتسجيل الدخول
 app.get('/api/users/list', async (req, res) => {
   const db = await loadDB();
   res.json((db.users || []).map(u => ({ id: u.id, name: u.name, role: u.role })));
@@ -150,7 +150,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// محرك OCR المباشر والدقيق
+// نقطة فحص الـ OCR المضبوطة بالكامل على واجهة Sage CRM
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image provided' });
@@ -163,24 +163,21 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
     const mimeType = req.file.mimetype || 'image/png';
     const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
-    const prompt = `Logistics OCR task for Sage CRM window.
-Extract all logistics values exactly as displayed on screen.
-
-RULES:
-1. blNumber: Copy the full B/L number string without skipping or omitting ANY digits or letters.
-2. alvSerial: Copy the serial preserving the exact spacing as shown on screen (e.g. format like "ALV149 08 2026").
-3. pallets: Extract the pallets number (e.g. "4"). If zero or blank on screen, return "0".
-4. qty: Extract package count as string (e.g. "4").
-5. weight: Extract the exact raw weight number displayed without any rounding (e.g. "1.04", "2.85").
-6. location: Extract the warehouse location code (e.g. "M1").
-7. clearanceCompany: Extract the company name.`;
+    const prompt = `Logistics OCR extraction mapped specifically to this Sage CRM interface:
+1. blNumber: Extract the exact text right next to 'B\\L No:' (e.g., 'M26EXL24052JOAQB'). Retain full characters verbatim without skipping any letter or digit.
+2. alvSerial: Extract the full string right under or next to 'ALV Serial:' preserving spaces (e.g., 'ALV149 08 2026').
+3. pallets: Extract the exact number directly below the label 'ALV Pallet:' (e.g., '4'). Do NOT ignore this field.
+4. qty: Extract the exact number under 'QTY:' (e.g., '4.0000').
+5. weight: Extract the exact raw number under 'Weight(Ton):' (e.g., '2.8400').
+6. clearanceCompany: Extract the company name written next to 'Company clearance:' (e.g., 'ARAB AMIRCAN CO ARAMEX'). Do NOT include any phone numbers.
+7. locations: Look at the bottom table titled 'B\\L Location'. Extract all unique codes listed under the 'Location' column (e.g. if all rows say 'M1', return ["M1"]. If rows have 'M1' and 'B3', return ["M1", "B3"]).`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: "You are a professional logistics OCR parser. Output strict JSON exactly matching the schema."
+          content: "You are a precise data extractor for Sage CRM logistics screenshots. Map the exact labeled UI elements to JSON."
         },
         {
           role: "user",
@@ -193,20 +190,24 @@ RULES:
       response_format: {
         type: "json_schema",
         json_schema: {
-          name: "sage_data",
+          name: "sage_exact_ui_mapping",
           strict: true,
           schema: {
             type: "object",
             properties: {
-              blNumber: { type: "string", description: "Full unabbreviated B/L number" },
-              alvSerial: { type: "string", description: "Serial number with original spaces" },
-              qty: { type: "string", description: "Package quantity" },
-              weight: { type: "string", description: "Raw weight numeric text" },
-              pallets: { type: "string", description: "Pallets quantity string" },
-              location: { type: "string", description: "Location code" },
-              clearanceCompany: { type: "string", description: "Clearance company name" }
+              blNumber: { type: "string", description: "Text beside B\\L No:" },
+              alvSerial: { type: "string", description: "Text under ALV Serial:" },
+              pallets: { type: "string", description: "Number under ALV Pallet:" },
+              qty: { type: "string", description: "Number under QTY:" },
+              weight: { type: "string", description: "Number under Weight(Ton):" },
+              clearanceCompany: { type: "string", description: "Company name beside Company clearance:" },
+              locations: { 
+                type: "array", 
+                items: { type: "string" }, 
+                description: "List of unique locations in B\\L Location table" 
+              }
             },
-            required: ["blNumber", "alvSerial", "qty", "weight", "pallets", "location", "clearanceCompany"],
+            required: ["blNumber", "alvSerial", "pallets", "qty", "weight", "clearanceCompany", "locations"],
             additionalProperties: false
           }
         }
@@ -217,30 +218,44 @@ RULES:
     const parsed = JSON.parse(completion.choices[0].message.content);
 
     // 1. تنظيف الأعداد
-    let cleanQty = parsed.qty ? String(parseInt(String(parsed.qty).replace(/,/g, ''), 10) || parsed.qty) : '';
-    let cleanPallets = (parsed.pallets !== undefined && parsed.pallets !== null && parsed.pallets !== '') 
-      ? String(parsed.pallets).trim() 
-      : '0';
+    let cleanQty = '';
+    if (parsed.qty) {
+      const q = parseFloat(String(parsed.qty).replace(/,/g, ''));
+      cleanQty = !isNaN(q) ? String(Math.floor(q)) : String(parsed.qty).trim();
+    }
 
-    // 2. تصفية أرقام الهواتف والفاكس من اسم الشركة برمجياً
+    let cleanPallets = '';
+    if (parsed.pallets !== undefined && parsed.pallets !== null && parsed.pallets !== '') {
+      const p = parseFloat(String(parsed.pallets).replace(/,/g, ''));
+      cleanPallets = !isNaN(p) ? String(Math.floor(p)) : String(parsed.pallets).trim();
+    }
+
+    // 2. تصفية اسم شركة التخليص برمجياً من أرقام الهواتف
     let cleanCompany = (parsed.clearanceCompany || '')
       .replace(/(?:tel|phone|mob|fax|هاتف|تلفون|خلوي|فاكس)?[:\s]*\+?\d[\d\s\-\/]{6,}\d/gi, '')
       .replace(/\s+/g, ' ')
       .trim();
 
-    // 3. معالجة الوزن والتقريب للأعلى (Math.ceil لأقرب 0.1)
+    // 3. التقريب الصارم للوزن للأعلى دائماً لأقرب 0.1 طن
     let finalWeight = '';
     if (parsed.weight) {
       const match = String(parsed.weight).replace(/,/g, '').match(/\d+(?:\.\d+)?/);
       if (match) {
         let num = parseFloat(match[0]);
         if (!isNaN(num) && num > 0) {
-          if (num > 50) num = num / 1000; // تحويل من كغم إلى طن إن وجد
+          if (num > 50) num = num / 1000; // في حال كان مسجلاً كغم
           finalWeight = (Math.ceil(parseFloat(num.toFixed(5)) * 10) / 10).toFixed(1);
         } else {
           finalWeight = match[0];
         }
       }
+    }
+
+    // 4. دمج المواقع المتعددة بعلامة + مع إزالة التكرار
+    let finalLocation = '';
+    if (Array.isArray(parsed.locations) && parsed.locations.length > 0) {
+      const uniqueLocs = [...new Set(parsed.locations.map(l => String(l).trim()).filter(Boolean))];
+      finalLocation = uniqueLocs.join(' + ');
     }
 
     return res.json({
@@ -249,7 +264,7 @@ RULES:
       qty: cleanQty,
       weight: finalWeight,
       pallets: cleanPallets,
-      location: (parsed.location || '').trim(),
+      location: finalLocation,
       clearanceCompany: cleanCompany
     });
 
