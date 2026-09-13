@@ -98,12 +98,16 @@
             <h1 class="text-xl font-black leading-none tracking-wide">Tahjeem</h1>
           </div>
         </div>
-        <div class="flex items-center space-x-4 text-sm">
+        <div class="flex items-center space-x-3 text-sm">
           <div class="bg-blue-800 px-3 py-1.5 rounded-lg flex items-center gap-2 border border-blue-700">
             <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
             <span id="navUserName" class="font-bold text-white">-</span>
             <span id="navUserRole" class="text-[11px] text-blue-200 bg-blue-950 px-2 py-0.5 rounded font-semibold uppercase tracking-wider">-</span>
           </div>
+          <!-- Secret AI Costs Button -->
+          <button onclick="promptCostModal()" class="bg-sky-600 hover:bg-sky-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+            <span>💳</span> AI Costs
+          </button>
           <button onclick="logout()" class="bg-rose-700 hover:bg-rose-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">Logout</button>
         </div>
       </div>
@@ -193,11 +197,9 @@
               Total Weight: <span id="totalWeightDisplay" class="text-blue-700 font-black text-xl">0.00</span> Tons
             </div>
             <div class="flex gap-3">
-              <!-- زر الطباعة يطبع ويؤرشف فوراً بضغطة واحدة -->
               <button onclick="handleManualPrintAndSave()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-6 rounded-xl shadow transition flex items-center gap-1.5 text-xs sm:text-sm">
                 <span>🖨️ Print & Save to Archive</span>
               </button>
-              <!-- إمكانية الإرسال للويرهاوس لا تزال موجودة إن لزم الأمر -->
               <button onclick="submitOrder()" class="bg-slate-700 hover:bg-slate-800 text-white font-bold py-2.5 px-5 rounded-xl shadow transition text-xs sm:text-sm">
                 <span>🚀 Send to Warehouse</span>
               </button>
@@ -239,7 +241,7 @@
         </div>
       </div>
 
-      <!-- 3. KPIs & Stats Section (إنجاز اليوم المخصص) -->
+      <!-- 3. KPIs & Stats Section -->
       <div id="section-stats" class="hidden space-y-6">
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-left">
           <div class="flex justify-between items-center mb-6 border-b pb-4 flex-wrap gap-4">
@@ -309,10 +311,61 @@
     </div>
   </div>
 
+  <!-- Secret AI Costs Modal (Protected by PIN 1010) -->
+  <div id="costModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-slate-900 text-white rounded-2xl shadow-2xl p-6 max-w-2xl w-full border border-slate-800 space-y-5">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">📊</span>
+          <h3 class="text-lg font-bold text-sky-400">AI Usage & Costs Dashboard</h3>
+        </div>
+        <button onclick="closeCostModal()" class="text-slate-400 hover:text-white text-2xl font-bold leading-none">&times;</button>
+      </div>
+
+      <div class="grid grid-cols-3 gap-3 text-center">
+        <div class="bg-slate-800/70 p-3.5 rounded-xl border border-slate-700">
+          <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total (USD)</div>
+          <div id="modalCostUSD" class="text-xl font-black text-emerald-400 mt-1">$0.00</div>
+        </div>
+        <div class="bg-slate-800/70 p-3.5 rounded-xl border border-slate-700">
+          <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total (JOD)</div>
+          <div id="modalCostJOD" class="text-xl font-black text-sky-400 mt-1">0.00 JOD</div>
+        </div>
+        <div class="bg-slate-800/70 p-3.5 rounded-xl border border-slate-700">
+          <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Operations</div>
+          <div id="modalCostOps" class="text-xl font-black text-amber-400 mt-1">0</div>
+        </div>
+      </div>
+
+      <div class="max-h-64 overflow-y-auto rounded-xl border border-slate-800">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-800/90 text-slate-400 uppercase text-[10px] sticky top-0">
+            <tr>
+              <th class="p-2.5">Time</th>
+              <th class="p-2.5">B/L Number</th>
+              <th class="p-2.5">Cost ($)</th>
+              <th class="p-2.5">Cost (JOD)</th>
+            </tr>
+          </thead>
+          <tbody id="modalCostTableBody" class="divide-y divide-slate-800 font-mono">
+          </tbody>
+        </table>
+      </div>
+
+      <div class="flex justify-between items-center pt-2 border-t border-slate-800 text-xs">
+        <button onclick="clearCostHistory()" class="bg-rose-900/40 hover:bg-rose-800 text-rose-300 hover:text-white px-3 py-1.5 rounded-lg font-bold border border-rose-800/50 transition">
+          🗑️ Clear History
+        </button>
+        <span class="text-[11px] text-slate-500">Live per-request consumption billing</span>
+      </div>
+    </div>
+  </div>
+
   <script>
     let state = { orders: [] };
     let usersList = [];
     let currentUser = null;
+    let verifiedPin = null;
 
     function formatTime12(dateObj) {
       return dateObj.toLocaleTimeString('en-US', {
@@ -567,7 +620,6 @@
       }
     }
 
-    // طباعة فورية وحفظ مباشر في الأرشيف
     async function handleManualPrintAndSave() {
       const bls = getFilledBLs();
       if (bls.length === 0) {
@@ -576,10 +628,8 @@
       }
       const totalWeight = parseFloat(document.getElementById('totalWeightDisplay').innerText) || 0;
 
-      // فتح نافذة الطباعة
       printFormalSlip(null);
 
-      // الحفظ المباشر في قاعدة البيانات والأرشيف
       await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -633,7 +683,6 @@
       calcTotalWeight();
     }
 
-    // ورقة الطباعة الرسمية
     function printFormalSlip(orderId) {
       let clearanceCompany = '';
       let dateStr = '';
@@ -923,7 +972,6 @@
       loadData();
     }
 
-    // عرض إحصائيات إنجاز اليوم الدقيقة
     async function loadStats() {
       const res = await fetch('/api/stats');
       const stats = await res.json();
@@ -944,7 +992,6 @@
             <div class="text-2xl">👤</div>
           </div>
           
-          <!-- قسم اليوم -->
           <div class="bg-amber-50/70 p-3 rounded-xl border border-amber-200">
             <span class="text-xs font-black text-amber-900 block mb-2">⚡ إنجاز اليوم (Today):</span>
             <div class="grid grid-cols-2 gap-2 text-center">
@@ -959,7 +1006,6 @@
             </div>
           </div>
 
-          <!-- قسم الإجمالي العام -->
           <div class="grid grid-cols-2 gap-2 text-center pt-1">
             <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
               <span class="text-[11px] text-slate-500 font-bold block">إجمالي البوالص</span>
@@ -1106,6 +1152,78 @@
         loadData();
         alert('تم تصدير البيانات وتفريغ قاعدة البيانات بالكامل بنجاح 🚀');
       }, 1500);
+    }
+
+    // إدارة لوحة مصاريف الذكاء الاصطناعي (PIN: 1010)
+    async function promptCostModal() {
+      const pin = prompt('Enter Admin PIN:');
+      if (!pin) return;
+      if (pin !== '1010') {
+        alert('Incorrect PIN!');
+        return;
+      }
+      verifiedPin = pin;
+      await fetchAndDisplayCosts();
+    }
+
+    async function fetchAndDisplayCosts() {
+      try {
+        const res = await fetch('/api/admin/costs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin: verifiedPin })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        document.getElementById('modalCostUSD').textContent = '$' + data.summary.totalUSD;
+        document.getElementById('modalCostJOD').textContent = data.summary.totalJOD + ' JOD';
+        document.getElementById('modalCostOps').textContent = data.summary.totalOps;
+
+        const tbody = document.getElementById('modalCostTableBody');
+        tbody.innerHTML = '';
+        data.history.forEach(item => {
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-slate-800/50 transition';
+          const time = new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          tr.innerHTML = `
+            <td class="p-2.5 text-slate-400">${time}</td>
+            <td class="p-2.5 font-bold text-slate-200">${item.blNumber}</td>
+            <td class="p-2.5 text-emerald-400">$${item.costUSD}</td>
+            <td class="p-2.5 text-sky-400">${item.costJOD} JOD</td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        const modal = document.getElementById('costModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      } catch (err) {
+        alert('Error loading costs: ' + err.message);
+      }
+    }
+
+    function closeCostModal() {
+      const modal = document.getElementById('costModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    async function clearCostHistory() {
+      if (!confirm('Are you sure you want to reset all cost history?')) return;
+      try {
+        const res = await fetch('/api/admin/costs/clear', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin: verifiedPin })
+        });
+        if (res.ok) {
+          alert('Cost history reset successfully');
+          fetchAndDisplayCosts();
+        }
+      } catch (e) {
+        alert('Error resetting history');
+      }
     }
 
     checkAuth();
