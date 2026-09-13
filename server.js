@@ -67,13 +67,12 @@ async function saveDB(data) {
   }
 }
 
-// خوارزمية التصويت بالأغلبية لحسم أي حرف مختلف
+// خوارزمية التصويت بالأغلبية لحسم أي حرف مختلف في البوليصة
 function resolveByMajority(candidates) {
   const valid = candidates.map(c => (c || '').trim()).filter(Boolean);
   if (!valid.length) return '';
   if (valid.length === 1) return valid[0];
 
-  // إيجاد أقصى طول
   const maxLen = Math.max(...valid.map(s => s.length));
   let result = '';
 
@@ -85,7 +84,6 @@ function resolveByMajority(candidates) {
         charVotes[ch] = (charVotes[ch] || 0) + 1;
       }
     }
-    // اختيار الحرف صاحب أكبر عدد تكرار في هذا الموضع
     let winnerChar = '';
     let maxVotes = -1;
     for (const [ch, count] of Object.entries(charVotes)) {
@@ -185,7 +183,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// نقطة فحص OCR مع قراءة كافة تكرارات البوليصة
+// محرك الـ OCR عالي الدقة مع التدقيق الصارم على اللوكيشن والبوليصة
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image provided' });
@@ -198,25 +196,26 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
     const mimeType = req.file.mimetype || 'image/png';
     const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
-    const prompt = `Perform OCR on this Sage CRM logistics screen:
+    const prompt = `Perform OCR on this Sage CRM logistics screen with extreme character-level accuracy:
 
-1. blCandidates: Extract ALL occurrences of the B/L number found on screen into an array:
+1. blCandidates: Extract ALL occurrences of the B/L number found on screen:
    - The string next to 'B\\L No:' at the top.
    - Each row's value in the first column ('B\\L') of the bottom table 'B\\L Location'.
-   Transcribe each occurrence faithfully as seen.
-2. alvSerial: The string below 'ALV Serial:' with its spaces.
+2. alvSerial: The text below 'ALV Serial:' preserving original spaces.
 3. pallets: The integer under 'ALV Pallet:'.
 4. qty: The quantity under 'QTY:'.
 5. weight: Raw weight number under 'Weight(Ton):'.
 6. clearanceCompany: Company name next to 'Company clearance:' (ignore phone numbers).
-7. locations: All unique location codes under 'Location' column in the bottom table.`;
+7. locations: Look at the bottom table 'B\\L Location'. Check the 'Location' and 'locname' columns for every row.
+   - Extract the COMPLETE code without omitting ANY letters, numbers, hyphens, or spaces (e.g., if it is 'M1', write 'M1'; if 'M1-A', transcribe all characters faithfully).
+   - Return all location entries found across all rows as an array of strings.`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
         {
           role: "system",
-          content: "You are a professional logistics OCR system. Extract all requested fields and all visual occurrences of the B/L into JSON."
+          content: "You are a professional logistics OCR system. Double-check all location codes character-by-character from the B\\L Location table and output strictly valid JSON."
         },
         {
           role: "user",
@@ -246,7 +245,8 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
               clearanceCompany: { type: "string" },
               locations: {
                 type: "array",
-                items: { type: "string" }
+                items: { type: "string" },
+                description: "Full location strings from Location and locname columns without missing characters"
               }
             },
             required: ["blCandidates", "alvSerial", "pallets", "qty", "weight", "clearanceCompany", "locations"],
@@ -291,7 +291,7 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
       }
     }
 
-    // 5. دمج المواقع المتعددة بعلامة + ومنع التكرار
+    // 5. دمج المواقع المتعددة بعلامة + ومنع تكرار نفس الموقع مع الحفاظ على كامل الحروف
     let finalLocation = '';
     if (Array.isArray(parsed.locations) && parsed.locations.length > 0) {
       const uniqueLocs = [...new Set(parsed.locations.map(l => String(l).trim()).filter(Boolean))];
