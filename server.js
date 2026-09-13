@@ -150,7 +150,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// نقطة فحص الـ OCR بترقية النموذج إلى gpt-4o كامل الدقة
+// محرك OCR المبسط والنقي المعتمد على ذكاء gpt-4o المباشر
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image provided' });
@@ -163,21 +163,21 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
     const mimeType = req.file.mimetype || 'image/png';
     const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
-    const prompt = `Logistics OCR extraction for Sage CRM screen:
-1. blNumber: Extract the exact string right next to 'B\\L No:'.
-2. alvSerial: Extract the full string under 'ALV Serial:' preserving spaces (e.g. 'ALV149 08 2026').
-3. pallets: Extract the exact number directly below 'ALV Pallet:' (e.g. '4').
-4. qty: Extract the exact number under 'QTY:' (e.g. '4.0000').
-5. weight: Extract the exact raw number under 'Weight(Ton):' (e.g. '2.8400').
-6. clearanceCompany: Locate 'Company clearance:'. Extract ONLY the company text name (e.g. 'ARAB AMIRCAN CO ARAMEX'). STOP before any telephone icon, pager, or phone number digits (like 6374242). Transcribe the company text verbatim character-for-character as printed, without changing any letters.
-7. locations: Look at the table 'B\\L Location' at the bottom. Extract all unique values from the 'Location' column.`;
+    const prompt = `Read the shipment details from this Sage CRM screenshot and extract these fields:
+- blNumber: The B/L number.
+- alvSerial: The ALV Serial.
+- pallets: Number of pallets (from ALV Pallet).
+- qty: Quantity.
+- weight: The weight value exactly as displayed.
+- clearanceCompany: Company clearance name (exclude any phone/fax numbers).
+- location: Warehouse location code (if multiple locations exist, combine them with ' + ').`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
         {
           role: "system",
-          content: "You are a professional, high-precision OCR engine specialized in Sage CRM logistics screens. Output strictly valid JSON matching the schema."
+          content: "You are an expert OCR system. Extract the requested fields accurately from the image and return valid JSON."
         },
         {
           role: "user",
@@ -190,24 +190,20 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
       response_format: {
         type: "json_schema",
         json_schema: {
-          name: "sage_exact_ui_mapping",
+          name: "crm_shipment_data",
           strict: true,
           schema: {
             type: "object",
             properties: {
-              blNumber: { type: "string", description: "Text beside B\\L No:" },
-              alvSerial: { type: "string", description: "Text under ALV Serial:" },
-              pallets: { type: "string", description: "Number under ALV Pallet:" },
-              qty: { type: "string", description: "Number under QTY:" },
-              weight: { type: "string", description: "Number under Weight(Ton):" },
-              clearanceCompany: { type: "string", description: "Company name text only beside Company clearance:" },
-              locations: { 
-                type: "array", 
-                items: { type: "string" }, 
-                description: "List of unique locations from B\\L Location table" 
-              }
+              blNumber: { type: "string" },
+              alvSerial: { type: "string" },
+              pallets: { type: "string" },
+              qty: { type: "string" },
+              weight: { type: "string" },
+              clearanceCompany: { type: "string" },
+              location: { type: "string" }
             },
-            required: ["blNumber", "alvSerial", "pallets", "qty", "weight", "clearanceCompany", "locations"],
+            required: ["blNumber", "alvSerial", "pallets", "qty", "weight", "clearanceCompany", "location"],
             additionalProperties: false
           }
         }
@@ -217,28 +213,11 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
 
     const parsed = JSON.parse(completion.choices[0].message.content);
 
-    // 1. تنظيف الأعداد
-    let cleanQty = '';
-    if (parsed.qty) {
-      const q = parseFloat(String(parsed.qty).replace(/,/g, ''));
-      cleanQty = !isNaN(q) ? String(Math.floor(q)) : String(parsed.qty).trim();
-    }
+    // 1. تنظيف الأعداد الأساسية
+    let cleanQty = parsed.qty ? String(parseInt(String(parsed.qty).replace(/,/g, ''), 10) || parsed.qty) : '';
+    let cleanPallets = parsed.pallets ? String(parseInt(String(parsed.pallets).replace(/,/g, ''), 10) || parsed.pallets) : '';
 
-    let cleanPallets = '';
-    if (parsed.pallets !== undefined && parsed.pallets !== null && parsed.pallets !== '') {
-      const p = parseFloat(String(parsed.pallets).replace(/,/g, ''));
-      cleanPallets = !isNaN(p) ? String(Math.floor(p)) : String(parsed.pallets).trim();
-    }
-
-    // 2. تنظيف اسم شركة التخليص بدقة
-    let cleanCompany = (parsed.clearanceCompany || '').trim();
-    cleanCompany = cleanCompany
-      .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|\u260E|\u2706|\u2121/g, '')
-      .replace(/\s+\d{4,}\b.*$/, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    // 3. التقريب الصارم للوزن للأعلى دائماً لأقرب 0.1 طن
+    // 2. الحساب الرياضي الوحيد المطلوب: تقريب الوزن للأعلى دائماً لأقرب 0.1 طن
     let finalWeight = '';
     if (parsed.weight) {
       const match = String(parsed.weight).replace(/,/g, '').match(/\d+(?:\.\d+)?/);
@@ -253,21 +232,14 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
       }
     }
 
-    // 4. دمج المواقع المتعددة بعلامة +
-    let finalLocation = '';
-    if (Array.isArray(parsed.locations) && parsed.locations.length > 0) {
-      const uniqueLocs = [...new Set(parsed.locations.map(l => String(l).trim()).filter(Boolean))];
-      finalLocation = uniqueLocs.join(' + ');
-    }
-
     return res.json({
       blNumber: (parsed.blNumber || '').trim(),
       alvSerial: (parsed.alvSerial || '').trim(),
       qty: cleanQty,
       weight: finalWeight,
       pallets: cleanPallets,
-      location: finalLocation,
-      clearanceCompany: cleanCompany
+      location: (parsed.location || '').trim(),
+      clearanceCompany: (parsed.clearanceCompany || '').trim()
     });
 
   } catch (err) {
