@@ -150,7 +150,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// محرك OCR المبسط والنقي المعتمد على ذكاء gpt-4o المباشر
+// محرك OCR المباشر عبر gpt-4o مع معالجة التكرار وحذف الهواتف
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image provided' });
@@ -164,13 +164,13 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
     const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
     const prompt = `Read the shipment details from this Sage CRM screenshot and extract these fields:
-- blNumber: The B/L number.
-- alvSerial: The ALV Serial.
-- pallets: Number of pallets (from ALV Pallet).
-- qty: Quantity.
-- weight: The weight value exactly as displayed.
-- clearanceCompany: Company clearance name (exclude any phone/fax numbers).
-- location: Warehouse location code (if multiple locations exist, combine them with ' + ').`;
+- blNumber: The B/L number right next to 'B\\L No:'.
+- alvSerial: The ALV Serial preserving original spaces.
+- pallets: Number of pallets under 'ALV Pallet:'.
+- qty: Quantity under 'QTY:'.
+- weight: The weight value under 'Weight(Ton):'.
+- clearanceCompany: Company clearance name (exclude any phone or contact numbers).
+- locations: Extract all location codes listed under the 'Location' column in the bottom 'B\\L Location' table as an array of strings.`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
@@ -201,9 +201,13 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
               qty: { type: "string" },
               weight: { type: "string" },
               clearanceCompany: { type: "string" },
-              location: { type: "string" }
+              locations: {
+                type: "array",
+                items: { type: "string" },
+                description: "All location entries from the Location column"
+              }
             },
-            required: ["blNumber", "alvSerial", "pallets", "qty", "weight", "clearanceCompany", "location"],
+            required: ["blNumber", "alvSerial", "pallets", "qty", "weight", "clearanceCompany", "locations"],
             additionalProperties: false
           }
         }
@@ -215,9 +219,19 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
 
     // 1. تنظيف الأعداد الأساسية
     let cleanQty = parsed.qty ? String(parseInt(String(parsed.qty).replace(/,/g, ''), 10) || parsed.qty) : '';
-    let cleanPallets = parsed.pallets ? String(parseInt(String(parsed.pallets).replace(/,/g, ''), 10) || parsed.pallets) : '';
+    let cleanPallets = (parsed.pallets !== undefined && parsed.pallets !== null && parsed.pallets !== '')
+      ? String(parseInt(String(parsed.pallets).replace(/,/g, ''), 10) || parsed.pallets)
+      : '';
 
-    // 2. الحساب الرياضي الوحيد المطلوب: تقريب الوزن للأعلى دائماً لأقرب 0.1 طن
+    // 2. تصفية أرقام الهواتف والفاكس والأيقونات نهائياً من اسم شركة التخليص
+    let cleanCompany = (parsed.clearanceCompany || '')
+      .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|\u260E|\u2706|\u2121/g, '') // إزالة أيقونات الهاتف
+      .replace(/(?:tel|phone|mob|fax|هاتف|تلفون|خلوي|فاكس)?[:\s]*\+?\d[\d\s\-\/]{4,}\d/gi, '') // إزالة أرقام الهواتف
+      .replace(/\s+\d{4,}\b.*$/, '') // إزالة أي رقم هاتف بنهاية الاسم
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // 3. تقريب الوزن للأعلى دائماً لأقرب 0.1 طن (Math.ceil)
     let finalWeight = '';
     if (parsed.weight) {
       const match = String(parsed.weight).replace(/,/g, '').match(/\d+(?:\.\d+)?/);
@@ -232,14 +246,22 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
       }
     }
 
+    // 4. معالجة المواقع: إزالة أي تكرار ودمج المواقع المختلفة فقط بعلامة +
+    let finalLocation = '';
+    if (Array.isArray(parsed.locations) && parsed.locations.length > 0) {
+      // إزالة الفراغات والتكرارات
+      const uniqueLocs = [...new Set(parsed.locations.map(l => String(l).trim()).filter(Boolean))];
+      finalLocation = uniqueLocs.join(' + ');
+    }
+
     return res.json({
       blNumber: (parsed.blNumber || '').trim(),
       alvSerial: (parsed.alvSerial || '').trim(),
       qty: cleanQty,
       weight: finalWeight,
       pallets: cleanPallets,
-      location: (parsed.location || '').trim(),
-      clearanceCompany: (parsed.clearanceCompany || '').trim()
+      location: finalLocation,
+      clearanceCompany: cleanCompany
     });
 
   } catch (err) {
