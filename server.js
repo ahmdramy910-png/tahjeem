@@ -6,11 +6,15 @@ const OpenAI = require('openai');
 require('dotenv').config();
 
 const app = express();
-const upload = multer({ storage: multer.memoryStorage() });
+// استقبال الصور كاملة الدقة حتى 50 ميجابايت
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }
+});
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 app.use(cors());
-app.use(express.json({ limit: '25mb' }));
+app.use(express.json({ limit: '50mb' }));
 app.use(express.static('public'));
 
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -100,7 +104,7 @@ app.get('/api/data', async (req, res) => {
   res.json({ orders: db.orders });
 });
 
-// إحصائيات اليوم والإجمالي لكل موظف
+// إحصائيات الموظفين
 app.get('/api/stats', async (req, res) => {
   const db = await loadDB();
   const stats = {};
@@ -150,7 +154,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// محرك OCR المزدوج: استخراج أولي + تدقيق ومراجعة تصحيحية ذاتية
+// نقطة فحص الـ OCR بدقة فائقة مع فحص مجهري للبوليصة
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image provided' });
@@ -163,92 +167,73 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
     const mimeType = req.file.mimetype || 'image/png';
     const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
-    const jsonSchema = {
-      name: "crm_shipment_data",
-      strict: true,
-      schema: {
-        type: "object",
-        properties: {
-          blNumber: { type: "string" },
-          alvSerial: { type: "string" },
-          pallets: { type: "string" },
-          qty: { type: "string" },
-          weight: { type: "string" },
-          clearanceCompany: { type: "string" },
-          locations: {
-            type: "array",
-            items: { type: "string" },
-            description: "All location entries from the Location column"
-          }
+    const prompt = `This is a screenshot of a Sage CRM logistics record.
+Extract the following shipment fields with 100% optical fidelity:
+
+1. blNumber: Extract the exact string right next to 'B\\L No:'.
+   - ZOOM IN and inspect every letter glyph carefully.
+   - Differentiate strictly between a closed oval 'O' and a tailed 'Q'. Only output 'Q' if a bottom tail is explicitly present. If it is an open oval or standard circle/oval, transcribe it faithfully as 'O'. Do NOT invent letters.
+2. alvSerial: The string below 'ALV Serial:' preserving original internal spaces (e.g. 'ALV149 08 2026').
+3. pallets: The integer under 'ALV Pallet:' (e.g. '4').
+4. qty: The quantity under 'QTY:'.
+5. weight: The raw numeric string under 'Weight(Ton):' (e.g. '2.8400').
+6. clearanceCompany: Company name next to 'Company clearance:' (STOP before any phone/fax icon or numbers).
+7. locations: Extract all location codes from the 'Location' column in the 'B\\L Location' table below as an array.`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: "You are a master logistics OCR system. Transcribe visible alphanumeric glyphs from Sage CRM with zero hallucination into strict JSON."
         },
-        required: ["blNumber", "alvSerial", "pallets", "qty", "weight", "clearanceCompany", "locations"],
-        additionalProperties: false
-      }
-    };
-
-    // المرحلة 1: الاستخراج الأولي (Initial Extraction)
-    const promptPass1 = `Extract shipment fields from this Sage CRM screenshot:
-- blNumber: Beside 'B\\L No:'.
-- alvSerial: Under 'ALV Serial:' preserving spaces.
-- pallets: Under 'ALV Pallet:'.
-- qty: Under 'QTY:'.
-- weight: Under 'Weight(Ton):'.
-- clearanceCompany: Beside 'Company clearance:' (text only, exclude phone numbers).
-- locations: Extract all values under 'Location' column in the bottom table.`;
-
-    const pass1 = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: "You are an expert OCR parser for Sage CRM screenshots." },
         {
           role: "user",
           content: [
-            { type: "text", text: promptPass1 },
+            { type: "text", text: prompt },
             { type: "image_url", image_url: { url: dataUrl, detail: "high" } }
           ]
         }
       ],
-      response_format: { type: "json_schema", json_schema: jsonSchema },
-      temperature: 0.0
-    });
-
-    const initialResult = pass1.choices[0].message.content;
-
-    // المرحلة 2: التدقيق والمقارنة والتصحيح الذاتي المباشر (Self-Correction & Verification)
-    const promptPass2 = `You are a forensic verification auditor.
-Review the original image and verify this initial OCR extraction:
-${initialResult}
-
-YOUR JOB:
-1. Re-read every letter and digit of blNumber, alvSerial, pallets, qty, weight, and clearanceCompany directly from the image.
-2. If there are any transcription typos, misread letters, missing digits, or extra phone numbers, CORRECT THEM NOW.
-3. Return the 100% verified and corrected final JSON matching the schema.`;
-
-    const pass2 = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: "You are a meticulous verification auditor. Inspect the image closely, correct any discrepancies, and output verified JSON." },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: promptPass2 },
-            { type: "image_url", image_url: { url: dataUrl, detail: "high" } }
-          ]
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "crm_shipment_data",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: {
+              blNumber: { type: "string" },
+              alvSerial: { type: "string" },
+              pallets: { type: "string" },
+              qty: { type: "string" },
+              weight: { type: "string" },
+              clearanceCompany: { type: "string" },
+              locations: {
+                type: "array",
+                items: { type: "string" }
+              }
+            },
+            required: ["blNumber", "alvSerial", "pallets", "qty", "weight", "clearanceCompany", "locations"],
+            additionalProperties: false
+          }
         }
-      ],
-      response_format: { type: "json_schema", json_schema: jsonSchema },
+      },
       temperature: 0.0
     });
 
-    const parsed = JSON.parse(pass2.choices[0].message.content);
+    const parsed = JSON.parse(completion.choices[0].message.content);
 
-    // تنظيف الأعداد
+    // 1. رقم البوليصة الصافي
+    let cleanBl = (parsed.blNumber || '').trim();
+
+    // 2. تنظيف الأعداد
     let cleanQty = parsed.qty ? String(parseInt(String(parsed.qty).replace(/,/g, ''), 10) || parsed.qty) : '';
     let cleanPallets = (parsed.pallets !== undefined && parsed.pallets !== null && parsed.pallets !== '')
       ? String(parseInt(String(parsed.pallets).replace(/,/g, ''), 10) || parsed.pallets)
       : '';
 
-    // تصفية أرقام الهواتف والفاكس من اسم شركة التخليص
+    // 3. تصفية أرقام الهواتف نهائياً من اسم شركة التخليص
     let cleanCompany = (parsed.clearanceCompany || '')
       .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|\u260E|\u2706|\u2121/g, '')
       .replace(/(?:tel|phone|mob|fax|هاتف|تلفون|خلوي|فاكس)?[:\s]*\+?\d[\d\s\-\/]{4,}\d/gi, '')
@@ -256,7 +241,7 @@ YOUR JOB:
       .replace(/\s+/g, ' ')
       .trim();
 
-    // تقريب الوزن للأعلى دائماً لأقرب 0.1 طن
+    // 4. تقريب الوزن للأعلى دائماً لأقرب 0.1 طن
     let finalWeight = '';
     if (parsed.weight) {
       const match = String(parsed.weight).replace(/,/g, '').match(/\d+(?:\.\d+)?/);
@@ -271,7 +256,7 @@ YOUR JOB:
       }
     }
 
-    // معالجة المواقع: إزالة أي تكرار ودمج المواقع المختلفة فقط بعلامة +
+    // 5. دمج المواقع المتعددة بعلامة + ومنع تكرار نفس الموقع
     let finalLocation = '';
     if (Array.isArray(parsed.locations) && parsed.locations.length > 0) {
       const uniqueLocs = [...new Set(parsed.locations.map(l => String(l).trim()).filter(Boolean))];
@@ -279,7 +264,7 @@ YOUR JOB:
     }
 
     return res.json({
-      blNumber: (parsed.blNumber || '').trim(),
+      blNumber: cleanBl,
       alvSerial: (parsed.alvSerial || '').trim(),
       qty: cleanQty,
       weight: finalWeight,
