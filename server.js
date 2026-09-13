@@ -150,7 +150,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// محرك فحص الـ OCR المضبوط بدقة لحقل اسم الشركة
+// نقطة فحص الـ OCR بترقية النموذج إلى gpt-4o كامل الدقة
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image provided' });
@@ -163,21 +163,21 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
     const mimeType = req.file.mimetype || 'image/png';
     const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
-    const prompt = `Logistics OCR extraction for Sage CRM:
+    const prompt = `Logistics OCR extraction for Sage CRM screen:
 1. blNumber: Extract the exact string right next to 'B\\L No:'.
 2. alvSerial: Extract the full string under 'ALV Serial:' preserving spaces (e.g. 'ALV149 08 2026').
 3. pallets: Extract the exact number directly below 'ALV Pallet:' (e.g. '4').
 4. qty: Extract the exact number under 'QTY:' (e.g. '4.0000').
 5. weight: Extract the exact raw number under 'Weight(Ton):' (e.g. '2.8400').
-6. clearanceCompany: Locate 'Company clearance:'. Extract ONLY the company text name (e.g. 'ARAB AMIRCAN CO ARAMEX'). STOP before any telephone icon, pager, or phone number digits (like 6374242). Transcribe the company text verbatim character-for-character as printed, without spell-checking or changing any letters.
+6. clearanceCompany: Locate 'Company clearance:'. Extract ONLY the company text name (e.g. 'ARAB AMIRCAN CO ARAMEX'). STOP before any telephone icon, pager, or phone number digits (like 6374242). Transcribe the company text verbatim character-for-character as printed, without changing any letters.
 7. locations: Look at the table 'B\\L Location' at the bottom. Extract all unique values from the 'Location' column.`;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       messages: [
         {
           role: "system",
-          content: "You are a specialized OCR parser for Sage CRM screenshots. Transcribe visual text verbatim into JSON."
+          content: "You are a professional, high-precision OCR engine specialized in Sage CRM logistics screens. Output strictly valid JSON matching the schema."
         },
         {
           role: "user",
@@ -230,12 +230,11 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
       cleanPallets = !isNaN(p) ? String(Math.floor(p)) : String(parsed.pallets).trim();
     }
 
-    // 2. تنظيف اسم شركة التخليص بدقة (حذف أي أرقام ملحقة بالاسم في النهاية)
+    // 2. تنظيف اسم شركة التخليص بدقة
     let cleanCompany = (parsed.clearanceCompany || '').trim();
-    // إزالة أي أرقام هواتف أو رموز في نهاية النص
     cleanCompany = cleanCompany
-      .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|\u260E|\u2706|\u2121/g, '') // إزالة رموز الهاتف الإيموجي
-      .replace(/\s+\d{4,}\b.*$/, '') // إزالة أي رقم هاتف متصل بنهاية الاسم
+      .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|\u260E|\u2706|\u2121/g, '')
+      .replace(/\s+\d{4,}\b.*$/, '')
       .replace(/\s+/g, ' ')
       .trim();
 
