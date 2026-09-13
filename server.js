@@ -3,6 +3,8 @@ const cors = require('cors');
 const multer = require('multer');
 const mongoose = require('mongoose');
 const OpenAI = require('openai');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -14,19 +16,19 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
-app.use(express.static('public'));
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
 const AppStateSchema = new mongoose.Schema({
   key: { type: String, default: 'main_state', unique: true },
   users: { type: Array, default: [] },
-  orders: { type: Array, default: [] }
+  orders: { type: Array, default: [] },
+  ocrCosts: { type: Array, default: [] }
 }, { timestamps: true });
 
 const AppState = mongoose.model('AppState', AppStateSchema);
 
-let memoryState = { users: [], orders: [] };
+let memoryState = { users: [], orders: [], ocrCosts: [] };
 let isConnectedToMongo = false;
 
 if (MONGODB_URI) {
@@ -35,7 +37,7 @@ if (MONGODB_URI) {
       isConnectedToMongo = true;
       console.log('✅ Connected to MongoDB Atlas');
       const doc = await AppState.findOne({ key: 'main_state' });
-      if (!doc) await AppState.create({ key: 'main_state', users: [], orders: [] });
+      if (!doc) await AppState.create({ key: 'main_state', users: [], orders: [], ocrCosts: [] });
     })
     .catch(err => console.error('MongoDB error:', err.message));
 }
@@ -58,7 +60,7 @@ async function saveDB(data) {
     try {
       await AppState.findOneAndUpdate(
         { key: 'main_state' },
-        { users: data.users, orders: data.orders },
+        { users: data.users, orders: data.orders, ocrCosts: data.ocrCosts },
         { upsert: true }
       );
     } catch (err) {
@@ -67,7 +69,27 @@ async function saveDB(data) {
   }
 }
 
-// خوارزمية التصويت بالأغلبية لحسم أي حرف مختلف في البوليصة
+// دالة حساب التكلفة الدقيقة
+function getExactCost(usage) {
+  if (!usage) {
+    return { inTokens: 0, outTokens: 0, totalTokens: 0, costUSD: 0, costJOD: 0 };
+  }
+  const inTokens = usage.prompt_tokens || 0;
+  const outTokens = usage.completion_tokens || 0;
+  const totalTokens = usage.total_tokens || (inTokens + outTokens);
+  const costUSD = (inTokens * 0.0000025) + (outTokens * 0.00001);
+  const costJOD = costUSD * 0.709;
+
+  return {
+    inTokens,
+    outTokens,
+    totalTokens,
+    costUSD: parseFloat(costUSD.toFixed(5)),
+    costJOD: parseFloat(costJOD.toFixed(5))
+  };
+}
+
+// خوارزمية التصويت بالأغلبية لرقم البوليصة
 function resolveByMajority(candidates) {
   const valid = candidates.map(c => (c || '').trim()).filter(Boolean);
   if (!valid.length) return '';
@@ -96,6 +118,42 @@ function resolveByMajority(candidates) {
   }
   return result;
 }
+
+// مسار التحقق من الرمز السري 1010
+app.post('/api/admin/costs', async (req, res) => {
+  const { pin } = req.body;
+  if (pin !== '1010') {
+    return res.status(403).json({ error: 'Invalid PIN!' });
+  }
+
+  const db = await loadDB();
+  const costs = db.ocrCosts || [];
+  
+  const totalUSD = costs.reduce((sum, item) => sum + (item.costUSD || 0), 0);
+  const totalJOD = costs.reduce((sum, item) => sum + (item.costJOD || 0), 0);
+  const totalTokens = costs.reduce((sum, item) => sum + (item.totalTokens || 0), 0);
+
+  res.json({
+    success: true,
+    summary: {
+      totalOps: costs.length,
+      totalUSD: parseFloat(totalUSD.toFixed(4)),
+      totalJOD: parseFloat(totalJOD.toFixed(4)),
+      totalTokens
+    },
+    history: costs.slice(-50).reverse()
+  });
+});
+
+app.post('/api/admin/costs/clear', async (req, res) => {
+  const { pin } = req.body;
+  if (pin !== '1010') return res.status(403).json({ error: 'Unauthorized' });
+
+  const db = await loadDB();
+  db.ocrCosts = [];
+  await saveDB(db);
+  res.json({ success: true, message: 'Cost history cleared' });
+});
 
 // مسارات المستخدمين
 app.get('/api/users/list', async (req, res) => {
@@ -183,7 +241,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// محرك الـ OCR عالي الدقة مع التدقيق الصارم على اللوكيشن والبوليصة
+// نقطة فحص الـ OCR وتوثيق التكلفة
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image provided' });
@@ -207,7 +265,7 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
 5. weight: Raw weight number under 'Weight(Ton):'.
 6. clearanceCompany: Company name next to 'Company clearance:' (ignore phone numbers).
 7. locations: Look at the bottom table 'B\\L Location'. Check the 'Location' and 'locname' columns for every row.
-   - Extract the COMPLETE code without omitting ANY letters, numbers, hyphens, or spaces (e.g., if it is 'M1', write 'M1'; if 'M1-A', transcribe all characters faithfully).
+   - Extract the COMPLETE code without omitting ANY letters, numbers, hyphens, or spaces.
    - Return all location entries found across all rows as an array of strings.`;
 
     const completion = await openai.chat.completions.create({
@@ -259,16 +317,28 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
 
     const parsed = JSON.parse(completion.choices[0].message.content);
 
-    // 1. استخراج رقم البوليصة عبر المقارنة والتصويت بين كل مواضع الظهور
+    // حساب التكلفة وحفظها
+    const costData = getExactCost(completion.usage);
     const finalBlNumber = resolveByMajority(parsed.blCandidates || []);
 
-    // 2. تنظيف الأعداد
+    const db = await loadDB();
+    if (!db.ocrCosts) db.ocrCosts = [];
+    db.ocrCosts.push({
+      timestamp: new Date().toISOString(),
+      blNumber: finalBlNumber || 'N/A',
+      costUSD: costData.costUSD,
+      costJOD: costData.costJOD,
+      totalTokens: costData.totalTokens
+    });
+    await saveDB(db);
+
+    // تنظيف الأعداد
     let cleanQty = parsed.qty ? String(parseInt(String(parsed.qty).replace(/,/g, ''), 10) || parsed.qty) : '';
     let cleanPallets = (parsed.pallets !== undefined && parsed.pallets !== null && parsed.pallets !== '')
       ? String(parseInt(String(parsed.pallets).replace(/,/g, ''), 10) || parsed.pallets)
       : '';
 
-    // 3. تصفية أرقام الهواتف من اسم الشركة
+    // تصفية أرقام الهواتف من اسم الشركة
     let cleanCompany = (parsed.clearanceCompany || '')
       .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|\u260E|\u2706|\u2121/g, '')
       .replace(/(?:tel|phone|mob|fax|هاتف|تلفون|خلوي|فاكس)?[:\s]*\+?\d[\d\s\-\/]{4,}\d/gi, '')
@@ -276,7 +346,7 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
       .replace(/\s+/g, ' ')
       .trim();
 
-    // 4. تقريب الوزن للأعلى دائماً لأقرب 0.1 طن
+    // تقريب الوزن للأعلى دائماً لأقرب 0.1 طن
     let finalWeight = '';
     if (parsed.weight) {
       const match = String(parsed.weight).replace(/,/g, '').match(/\d+(?:\.\d+)?/);
@@ -291,7 +361,7 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
       }
     }
 
-    // 5. دمج المواقع المتعددة بعلامة + ومنع تكرار نفس الموقع مع الحفاظ على كامل الحروف
+    // دمج المواقع المتعددة بعلامة + ومنع التكرار
     let finalLocation = '';
     if (Array.isArray(parsed.locations) && parsed.locations.length > 0) {
       const uniqueLocs = [...new Set(parsed.locations.map(l => String(l).trim()).filter(Boolean))];
@@ -367,6 +437,137 @@ app.delete('/api/orders/clear-all', async (req, res) => {
   await saveDB(db);
   res.json({ success: true, message: 'Archive cleared' });
 });
+
+// حقن تبويب قائمة التكاليف باللغة الإنجليزية
+app.get('*', (req, res, next) => {
+  const indexPath = path.join(__dirname, 'public', 'index.html');
+  if (fs.existsSync(indexPath) && (req.path === '/' || req.path === '/index.html')) {
+    let html = fs.readFileSync(indexPath, 'utf8');
+    
+    const navTabHtml = `
+    <!-- Top Nav Button for AI Costs (English) -->
+    <div style="position:fixed; top:12px; left:16px; z-index:99999;">
+      <button onclick="openCostDashboardDirectly()" style="background:#0f172a; color:#38bdf8; border:1px solid #38bdf8; padding:7px 14px; border-radius:8px; font-weight:bold; font-size:13px; cursor:pointer; box-shadow:0 4px 6px rgba(0,0,0,0.3); display:flex; align-items:center; gap:6px; font-family:sans-serif;">
+        <span>💳</span> AI Costs
+      </button>
+    </div>
+
+    <!-- Cost Dashboard Modal (English) -->
+    <div id="secretCostModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999999; justify-content:center; align-items:center; font-family:sans-serif;" dir="ltr">
+      <div style="background:#1e293b; color:#fff; width:92%; max-width:650px; border-radius:12px; padding:24px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.5); border:1px solid #334155;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:12px; margin-bottom:16px;">
+          <h3 style="margin:0; font-size:18px; color:#38bdf8;">📊 AI Usage & Cost Dashboard</h3>
+          <button onclick="document.getElementById('secretCostModal').style.display='none'" style="background:transparent; border:none; color:#94a3b8; font-size:22px; cursor:pointer;">&times;</button>
+        </div>
+        
+        <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-bottom:20px;">
+          <div style="background:#0f172a; padding:12px; border-radius:8px; text-align:center;">
+            <div style="color:#94a3b8; font-size:12px;">Total (USD)</div>
+            <div id="sumUSD" style="font-size:20px; font-weight:bold; color:#10b981; margin-top:4px;">$0.00</div>
+          </div>
+          <div style="background:#0f172a; padding:12px; border-radius:8px; text-align:center;">
+            <div style="color:#94a3b8; font-size:12px;">Total (JOD)</div>
+            <div id="sumJOD" style="font-size:20px; font-weight:bold; color:#38bdf8; margin-top:4px;">0.00 JOD</div>
+          </div>
+          <div style="background:#0f172a; padding:12px; border-radius:8px; text-align:center;">
+            <div style="color:#94a3b8; font-size:12px;">Total Operations</div>
+            <div id="sumOps" style="font-size:20px; font-weight:bold; color:#f59e0b; margin-top:4px;">0</div>
+          </div>
+        </div>
+
+        <div style="max-height:260px; overflow-y:auto; border:1px solid #334155; border-radius:8px;">
+          <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
+            <thead>
+              <tr style="background:#0f172a; color:#94a3b8;">
+                <th style="padding:10px;">Time</th>
+                <th style="padding:10px;">B/L Number</th>
+                <th style="padding:10px;">Cost ($)</th>
+                <th style="padding:10px;">Cost (JOD)</th>
+              </tr>
+            </thead>
+            <tbody id="costTableBody"></tbody>
+          </table>
+        </div>
+
+        <div style="margin-top:16px; display:flex; justify-content:space-between; align-items:center;">
+          <button onclick="clearCostHistory()" style="background:#ef4444; color:#fff; border:none; padding:8px 14px; border-radius:6px; font-size:12px; cursor:pointer;">Reset History</button>
+          <span style="font-size:11px; color:#64748b;">Live data calculated per OCR operation</span>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let currentPin = '';
+
+      async function openCostDashboardDirectly() {
+        const pin = prompt('Enter Admin PIN:');
+        if (!pin) return;
+        if (pin !== '1010') {
+          alert('Incorrect PIN!');
+          return;
+        }
+        currentPin = pin;
+
+        try {
+          const res = await fetch('/api/admin/costs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pin: currentPin })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error);
+
+          document.getElementById('sumUSD').textContent = '$' + data.summary.totalUSD;
+          document.getElementById('sumJOD').textContent = data.summary.totalJOD + ' JOD';
+          document.getElementById('sumOps').textContent = data.summary.totalOps;
+
+          const tbody = document.getElementById('costTableBody');
+          tbody.innerHTML = '';
+          data.history.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid #334155';
+            const time = new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            tr.innerHTML = \`
+              <td style="padding:8px 10px; color:#94a3b8;">\${time}</td>
+              <td style="padding:8px 10px; font-weight:bold; color:#e2e8f0;">\${item.blNumber}</td>
+              <td style="padding:8px 10px; color:#10b981;">$\${item.costUSD}</td>
+              <td style="padding:8px 10px; color:#38bdf8;">\${item.costJOD} JOD</td>
+            \`;
+            tbody.appendChild(tr);
+          });
+
+          document.getElementById('secretCostModal').style.display = 'flex';
+        } catch (e) {
+          alert(e.message);
+        }
+      }
+
+      async function clearCostHistory() {
+        if (!confirm('Are you sure you want to clear cost history?')) return;
+        try {
+          const res = await fetch('/api/admin/costs/clear', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pin: currentPin })
+          });
+          if (res.ok) {
+            alert('Cost history cleared successfully');
+            document.getElementById('secretCostModal').style.display = 'none';
+          }
+        } catch (e) {
+          alert('Error clearing cost history');
+        }
+      }
+    </script>
+    `;
+
+    html = html.replace('</body>', `${navTabHtml}</body>`);
+    return res.send(html);
+  }
+  next();
+});
+
+app.use(express.static('public'));
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Tahjeem server running on port ${PORT}`));
