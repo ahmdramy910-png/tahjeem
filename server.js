@@ -3,8 +3,6 @@ const cors = require('cors');
 const multer = require('multer');
 const mongoose = require('mongoose');
 const OpenAI = require('openai');
-const fs = require('fs');
-const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -16,6 +14,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+app.use(express.static('public'));
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -28,7 +27,7 @@ const AppStateSchema = new mongoose.Schema({
 
 const AppState = mongoose.model('AppState', AppStateSchema);
 
-let memoryState = { users: [], orders: [] };
+let memoryState = { users: [], orders: [], ocrCosts: [] };
 let isConnectedToMongo = false;
 
 if (MONGODB_URI) {
@@ -37,7 +36,7 @@ if (MONGODB_URI) {
       isConnectedToMongo = true;
       console.log('✅ Connected to MongoDB Atlas');
       const doc = await AppState.findOne({ key: 'main_state' });
-      if (!doc) await AppState.create({ key: 'main_state', users: [], orders: [] });
+      if (!doc) await AppState.create({ key: 'main_state', users: [], orders: [], ocrCosts: [] });
     })
     .catch(err => console.error('MongoDB error:', err.message));
 }
@@ -118,141 +117,6 @@ function resolveByMajority(candidates) {
   }
   return result;
 }
-
-// كود لوحة التكاليف المحقونة
-const costUI = `
-<!-- Cost Dashboard Injection -->
-<div style="position:fixed; top:12px; right:16px; z-index:9999999;">
-  <button id="btnAiCosts" onclick="openCostDashboardDirectly()" style="background:#0284c7; color:#ffffff; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; font-size:14px; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.3); font-family:sans-serif; display:flex; align-items:center; gap:8px;">
-    <span>💳</span> AI Costs
-  </button>
-</div>
-
-<div id="secretCostModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:99999999; justify-content:center; align-items:center; font-family:sans-serif;" dir="ltr">
-  <div style="background:#1e293b; color:#fff; width:92%; max-width:650px; border-radius:12px; padding:24px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.7); border:1px solid #334155;">
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:12px; margin-bottom:16px;">
-      <h3 style="margin:0; font-size:18px; color:#38bdf8;">📊 AI Usage & Cost Dashboard</h3>
-      <button onclick="document.getElementById('secretCostModal').style.display='none'" style="background:transparent; border:none; color:#94a3b8; font-size:24px; cursor:pointer;">&times;</button>
-    </div>
-    
-    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-bottom:20px;">
-      <div style="background:#0f172a; padding:12px; border-radius:8px; text-align:center;">
-        <div style="color:#94a3b8; font-size:12px;">Total (USD)</div>
-        <div id="sumUSD" style="font-size:20px; font-weight:bold; color:#10b981; margin-top:4px;">$0.00</div>
-      </div>
-      <div style="background:#0f172a; padding:12px; border-radius:8px; text-align:center;">
-        <div style="color:#94a3b8; font-size:12px;">Total (JOD)</div>
-        <div id="sumJOD" style="font-size:20px; font-weight:bold; color:#38bdf8; margin-top:4px;">0.00 JOD</div>
-      </div>
-      <div style="background:#0f172a; padding:12px; border-radius:8px; text-align:center;">
-        <div style="color:#94a3b8; font-size:12px;">Total Operations</div>
-        <div id="sumOps" style="font-size:20px; font-weight:bold; color:#f59e0b; margin-top:4px;">0</div>
-      </div>
-    </div>
-
-    <div style="max-height:260px; overflow-y:auto; border:1px solid #334155; border-radius:8px;">
-      <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
-        <thead>
-          <tr style="background:#0f172a; color:#94a3b8;">
-            <th style="padding:10px;">Time</th>
-            <th style="padding:10px;">B/L Number</th>
-            <th style="padding:10px;">Cost ($)</th>
-            <th style="padding:10px;">Cost (JOD)</th>
-          </tr>
-        </thead>
-        <tbody id="costTableBody"></tbody>
-      </table>
-    </div>
-
-    <div style="margin-top:16px; display:flex; justify-content:space-between; align-items:center;">
-      <button onclick="clearCostHistory()" style="background:#ef4444; color:#fff; border:none; padding:8px 14px; border-radius:6px; font-size:12px; cursor:pointer;">Reset History</button>
-      <span style="font-size:11px; color:#64748b;">Live data calculated per OCR operation</span>
-    </div>
-  </div>
-</div>
-
-<script>
-  let currentPin = '';
-
-  async function openCostDashboardDirectly() {
-    const pin = prompt('Enter Admin PIN:');
-    if (!pin) return;
-    if (pin !== '1010') {
-      alert('Incorrect PIN!');
-      return;
-    }
-    currentPin = pin;
-
-    try {
-      const res = await fetch('/api/admin/costs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: currentPin })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-
-      document.getElementById('sumUSD').textContent = '$' + data.summary.totalUSD;
-      document.getElementById('sumJOD').textContent = data.summary.totalJOD + ' JOD';
-      document.getElementById('sumOps').textContent = data.summary.totalOps;
-
-      const tbody = document.getElementById('costTableBody');
-      tbody.innerHTML = '';
-      data.history.forEach(item => {
-        const tr = document.createElement('tr');
-        tr.style.borderBottom = '1px solid #334155';
-        const time = new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        tr.innerHTML = \`
-          <td style="padding:8px 10px; color:#94a3b8;">\${time}</td>
-          <td style="padding:8px 10px; font-weight:bold; color:#e2e8f0;">\${item.blNumber}</td>
-          <td style="padding:8px 10px; color:#10b981;">$\${item.costUSD}</td>
-          <td style="padding:8px 10px; color:#38bdf8;">\${item.costJOD} JOD</td>
-        \`;
-        tbody.appendChild(tr);
-      });
-
-      document.getElementById('secretCostModal').style.display = 'flex';
-    } catch (e) {
-      alert(e.message);
-    }
-  }
-
-  async function clearCostHistory() {
-    if (!confirm('Are you sure you want to clear cost history?')) return;
-    try {
-      const res = await fetch('/api/admin/costs/clear', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: currentPin })
-      });
-      if (res.ok) {
-        alert('Cost history cleared successfully');
-        document.getElementById('secretCostModal').style.display = 'none';
-      }
-    } catch (e) {
-      alert('Error clearing cost history');
-    }
-  }
-</script>
-`;
-
-// مسار الصفحة الرئيسية المعدلة إجبارياً
-app.get(['/', '/index.html'], (req, res) => {
-  const indexPath = path.join(__dirname, 'public', 'index.html');
-  if (fs.existsSync(indexPath)) {
-    let html = fs.readFileSync(indexPath, 'utf8');
-    if (html.includes('</body>')) {
-      html = html.replace('</body>', `${costUI}</body>`);
-    } else {
-      html = html + costUI;
-    }
-    return res.send(html);
-  }
-  res.send(`<h1>Tahjeem App Running</h1>${costUI}`);
-});
-
-// خدمة بقية الملفات (CSS, JS, إلخ)
-app.use(express.static('public'));
 
 // مسار التحقق من الرمز السري 1010
 app.post('/api/admin/costs', async (req, res) => {
@@ -376,7 +240,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// نقطة فحص الـ OCR وتوثيق التكلفة
+// محرك OCR الدقيق مع تسجيل التكاليف
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image provided' });
