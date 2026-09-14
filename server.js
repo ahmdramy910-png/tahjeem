@@ -68,7 +68,7 @@ async function saveDB(data) {
   }
 }
 
-// دالة حساب التكلفة الفعلية
+// حساب التكلفة الدقيقة للطلب
 function getExactCost(usage) {
   if (!usage) {
     return { inTokens: 0, outTokens: 0, totalTokens: 0, costUSD: 0, costJOD: 0 };
@@ -88,7 +88,7 @@ function getExactCost(usage) {
   };
 }
 
-// خوارزمية التصويت بالأغلبية
+// خوارزمية التصويت بالأغلبية لرقم البوليصة
 function resolveByMajority(candidates) {
   const valid = candidates.map(c => (c || '').trim()).filter(Boolean);
   if (!valid.length) return '';
@@ -118,7 +118,7 @@ function resolveByMajority(candidates) {
   return result;
 }
 
-// مسار التحقق من الرمز السري 1010
+// مسار فحص الرمز السري وجلب التكاليف
 app.post('/api/admin/costs', async (req, res) => {
   const { pin } = req.body;
   if (pin !== '1010') {
@@ -154,7 +154,7 @@ app.post('/api/admin/costs/clear', async (req, res) => {
   res.json({ success: true, message: 'Cost history cleared' });
 });
 
-// مسارات المستخدمين
+// مسارات المستخدمين وتسجيل الدخول
 app.get('/api/users/list', async (req, res) => {
   const db = await loadDB();
   res.json((db.users || []).map(u => ({ id: u.id, name: u.name, role: u.role })));
@@ -240,7 +240,7 @@ app.get('/api/stats', async (req, res) => {
   res.json(stats);
 });
 
-// محرك OCR الدقيق مع تسجيل التكاليف
+// نقطة فحص OCR وتوثيق التكلفة
 app.post('/api/ocr', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image provided' });
@@ -316,7 +316,7 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
 
     const parsed = JSON.parse(completion.choices[0].message.content);
 
-    // حساب التكلفة وحفظها
+    // حساب التكلفة وتسجيلها
     const costData = getExactCost(completion.usage);
     const finalBlNumber = resolveByMajority(parsed.blCandidates || []);
 
