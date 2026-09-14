@@ -126,7 +126,10 @@
       <div id="section-cs" class="space-y-6">
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           <div class="flex justify-between items-center mb-4 pb-2 border-b">
-            <h2 class="text-base font-extrabold text-blue-950">New Shipment Order (Max 3 B/Ls)</h2>
+            <div>
+              <h2 class="text-base font-extrabold text-blue-950">New Shipment Order (Max 3 B/Ls)</h2>
+              <p class="text-xs text-indigo-600 font-semibold mt-0.5">⚡ اضغط Ctrl + V بأي وقت للصق لقطة الشاشة مباشرة وتعبئة أول بوليصة فارغة</p>
+            </div>
             <span class="text-xs text-slate-400">1 Trip / Vehicle Order</span>
           </div>
 
@@ -583,16 +586,16 @@
       return bls;
     }
 
-    async function handleOCR(e, index) {
-      const file = e.target.files[0];
-      if (!file) return;
-
+    // دالة معالجة واستخراج بيانات الصورة عبر الـ OCR
+    async function processOCRFile(file, index) {
       const btnLabel = document.getElementById(`btn-ocr-${index}`);
-      btnLabel.innerHTML = '<span>⏳</span>';
-      btnLabel.classList.add('opacity-75');
+      if (btnLabel) {
+        btnLabel.innerHTML = '<span>⏳</span>';
+        btnLabel.classList.add('opacity-75');
+      }
 
       const formData = new FormData();
-      formData.append('image', file);
+      formData.append('image', file, 'screen.png');
 
       try {
         const res = await fetch('/api/ocr', { method: 'POST', body: formData });
@@ -614,11 +617,57 @@
       } catch (err) {
         alert('OCR Error: ' + err.message);
       } finally {
-        btnLabel.innerHTML = '<span>📷</span><input type="file" accept="image/*" class="hidden" onchange="handleOCR(event, ' + index + ')">';
-        btnLabel.classList.remove('opacity-75');
-        e.target.value = '';
+        if (btnLabel) {
+          btnLabel.innerHTML = '<span>📷</span><input type="file" accept="image/*" class="hidden" onchange="handleOCR(event, ' + index + ')">';
+          btnLabel.classList.remove('opacity-75');
+        }
       }
     }
+
+    // رفع صورة يدوية من الملفات عبر كبسة الكاميرا
+    async function handleOCR(e, index) {
+      const file = e.target.files[0];
+      if (!file) return;
+      await processOCRFile(file, index);
+      e.target.value = '';
+    }
+
+    // ميزة اللصق التلقائي (Ctrl + V) من الحافظة مباشرة لأول بوليصة فارغة
+    window.addEventListener('paste', async (event) => {
+      const csSection = document.getElementById('section-cs');
+      if (csSection && csSection.classList.contains('hidden')) return;
+
+      const items = (event.clipboardData || event.originalEvent.clipboardData)?.items;
+      if (!items) return;
+
+      for (let item of items) {
+        if (item.type.indexOf('image') !== -1) {
+          const file = item.getAsFile();
+          if (file) {
+            event.preventDefault();
+
+            // فحص أول بوليصة فارغة
+            let targetIndex = 0;
+            const b0 = document.getElementById('bl-0-no').value.trim();
+            const b1 = document.getElementById('bl-1-no').value.trim();
+            const b2 = document.getElementById('bl-2-no').value.trim();
+
+            if (!b0) {
+              targetIndex = 0;
+            } else if (!b1) {
+              targetIndex = 1;
+            } else if (!b2) {
+              targetIndex = 2;
+            } else {
+              targetIndex = 0;
+            }
+
+            await processOCRFile(file, targetIndex);
+            break;
+          }
+        }
+      }
+    });
 
     async function handleManualPrintAndSave() {
       const bls = getFilledBLs();
