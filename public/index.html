@@ -104,7 +104,6 @@
             <span id="navUserName" class="font-bold text-white">-</span>
             <span id="navUserRole" class="text-[11px] text-blue-200 bg-blue-950 px-2 py-0.5 rounded font-semibold uppercase tracking-wider">-</span>
           </div>
-          <!-- Secret AI Costs Button -->
           <button onclick="promptCostModal()" class="bg-sky-600 hover:bg-sky-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
             <span>💳</span> AI Costs
           </button>
@@ -126,10 +125,7 @@
       <div id="section-cs" class="space-y-6">
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           <div class="flex justify-between items-center mb-4 pb-2 border-b">
-            <div>
-              <h2 class="text-base font-extrabold text-blue-950">New Shipment Order (Max 3 B/Ls)</h2>
-              <p class="text-xs text-indigo-600 font-semibold mt-0.5">⚡ اضغط Ctrl + V بأي وقت للصق لقطة الشاشة مباشرة وتعبئة أول بوليصة فارغة</p>
-            </div>
+            <h2 class="text-base font-extrabold text-blue-950">New Shipment Order (Max 3 B/Ls)</h2>
             <span class="text-xs text-slate-400">1 Trip / Vehicle Order</span>
           </div>
 
@@ -214,7 +210,7 @@
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
             <h2 class="text-base font-extrabold text-slate-800">Recent Operations</h2>
-            <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow transition">📊 تصدير الطلبات (Excel)</button>
+            <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow transition">📊 Export (Excel)</button>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs sm:text-sm">
@@ -250,10 +246,9 @@
           <div class="flex justify-between items-center mb-6 border-b pb-4 flex-wrap gap-4">
             <div>
               <h2 class="text-xl font-black text-blue-950">Daily Productivity Report</h2>
-              <p class="text-xs text-slate-500">متابعة إنجاز كل موظف باليوم الحالي والإجمالي العام للشحنات والبوالص.</p>
             </div>
             <button onclick="exportStatsToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow transition">
-              📊 تصدير إحصائية الإنتاجية (Excel)
+              📊 Export KPIs (Excel)
             </button>
           </div>
           <div id="statsCardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -268,21 +263,20 @@
           <div class="flex justify-between items-center mb-6 flex-wrap gap-4 border-b pb-4">
             <div>
               <h2 class="text-lg font-black text-blue-950">Archive & System Database</h2>
-              <p class="text-xs text-slate-500">جميع البوالص المطبوعة محفوظة هنا بشكل فوري ودائم.</p>
             </div>
             
             <div class="flex flex-wrap items-center gap-2 text-xs">
               <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 rounded-lg shadow transition">
-                📊 تصدير الأرشيف (Excel)
+                📊 Export (Excel)
               </button>
               <button onclick="cleanOldOrders(7)" class="bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-2 rounded-lg shadow transition">
-                🧹 حذف الأقدم من 7 أيام
+                🧹 Clear > 7 Days
               </button>
               <button onclick="cleanOldOrders(30)" class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-2 rounded-lg shadow transition">
-                🗑️ حذف الأقدم من 30 يوماً
+                🗑️ Clear > 30 Days
               </button>
               <button onclick="exportAndClearAll()" class="bg-red-800 hover:bg-black text-white font-extrabold px-3 py-2 rounded-lg shadow transition">
-                ⚠️ تفريغ كامل الأرشيف
+                ⚠️ Clear Full Archive
               </button>
             </div>
           </div>
@@ -586,7 +580,6 @@
       return bls;
     }
 
-    // دالة معالجة واستخراج بيانات الصورة عبر الـ OCR
     async function processOCRFile(file, index) {
       const btnLabel = document.getElementById(`btn-ocr-${index}`);
       if (btnLabel) {
@@ -624,7 +617,6 @@
       }
     }
 
-    // رفع صورة يدوية من الملفات عبر كبسة الكاميرا
     async function handleOCR(e, index) {
       const file = e.target.files[0];
       if (!file) return;
@@ -632,7 +624,6 @@
       e.target.value = '';
     }
 
-    // ميزة اللصق التلقائي (Ctrl + V) من الحافظة مباشرة لأول بوليصة فارغة
     window.addEventListener('paste', async (event) => {
       const csSection = document.getElementById('section-cs');
       if (csSection && csSection.classList.contains('hidden')) return;
@@ -646,7 +637,6 @@
           if (file) {
             event.preventDefault();
 
-            // فحص أول بوليصة فارغة
             let targetIndex = 0;
             const b0 = document.getElementById('bl-0-no').value.trim();
             const b1 = document.getElementById('bl-1-no').value.trim();
@@ -1042,14 +1032,14 @@
           </div>
           
           <div class="bg-amber-50/70 p-3 rounded-xl border border-amber-200">
-            <span class="text-xs font-black text-amber-900 block mb-2">⚡ إنجاز اليوم (Today):</span>
+            <span class="text-xs font-black text-amber-900 block mb-2">⚡ Today:</span>
             <div class="grid grid-cols-2 gap-2 text-center">
               <div class="bg-white p-2.5 rounded-lg border border-amber-100">
-                <span class="text-[11px] text-slate-500 font-bold block">بوالص اليوم</span>
+                <span class="text-[11px] text-slate-500 font-bold block">Today B/Ls</span>
                 <span class="text-2xl font-black text-blue-700">${data.todayBLs}</span>
               </div>
               <div class="bg-white p-2.5 rounded-lg border border-amber-100">
-                <span class="text-[11px] text-slate-500 font-bold block">سيارات اليوم</span>
+                <span class="text-[11px] text-slate-500 font-bold block">Today Vehicles</span>
                 <span class="text-2xl font-black text-emerald-700">${data.todayCars}</span>
               </div>
             </div>
@@ -1057,11 +1047,11 @@
 
           <div class="grid grid-cols-2 gap-2 text-center pt-1">
             <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-              <span class="text-[11px] text-slate-500 font-bold block">إجمالي البوالص</span>
+              <span class="text-[11px] text-slate-500 font-bold block">Total B/Ls</span>
               <span class="text-lg font-black text-slate-700">${data.totalBLs}</span>
             </div>
             <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-              <span class="text-[11px] text-slate-500 font-bold block">إجمالي السيارات</span>
+              <span class="text-[11px] text-slate-500 font-bold block">Total Vehicles</span>
               <span class="text-lg font-black text-slate-700">${data.totalCars}</span>
             </div>
           </div>
@@ -1072,17 +1062,17 @@
     function exportStatsToExcel() {
       fetch('/api/stats').then(r => r.json()).then(stats => {
         const data = Object.entries(stats).map(([name, d]) => ({
-          'اسم الموظف': name,
-          'القسم': d.role,
-          'بوالص اليوم': d.todayBLs,
-          'سيارات اليوم': d.todayCars,
-          'إجمالي البوالص': d.totalBLs,
-          'إجمالي السيارات': d.totalCars
+          'Employee Name': name,
+          'Department': d.role,
+          'Today B/Ls': d.todayBLs,
+          'Today Vehicles': d.todayCars,
+          'Total B/Ls': d.totalBLs,
+          'Total Vehicles': d.totalCars
         }));
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "تقرير إنجاز اليوم");
-        XLSX.writeFile(wb, `تقرير_الانجاز_اليومي_${new Date().toISOString().slice(0,10)}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, "Productivity Report");
+        XLSX.writeFile(wb, `Daily_KPI_Report_${new Date().toISOString().slice(0,10)}.xlsx`);
       });
     }
 
@@ -1164,46 +1154,45 @@
         const d = new Date(o.createdAt);
         o.bls.forEach((b, idx) => {
           data.push({
-            'رقم الطلب': o.id,
-            'التاريخ': formatDateEn(d),
-            'الوقت': formatTime12(d),
-            'منشئ الطلب': o.createdBy,
-            'الحالة': o.status,
-            'البند': `بوليصة (${idx + 1})`,
-            'رقم البوليصة (B/L)': b.blNumber,
-            'الرقم التسلسلي': b.alvSerial,
-            'العدد': b.qty,
-            'الوزن (طن)': b.weight,
-            'البلتات': b.pallets,
-            'الموقع': b.location,
-            'شركة التخليص': b.clearanceCompany
+            'Order ID': o.id,
+            'Date': formatDateEn(d),
+            'Time': formatTime12(d),
+            'Staff': o.createdBy,
+            'Status': o.status,
+            'Item': `B/L (${idx + 1})`,
+            'B/L Number': b.blNumber,
+            'Serial No': b.alvSerial,
+            'QTY': b.qty,
+            'Weight (T)': b.weight,
+            'Pallets': b.pallets,
+            'Location': b.location,
+            'Clearance Co': b.clearanceCompany
           });
         });
       });
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "أرشيف الطلبات");
-      XLSX.writeFile(wb, `ارشيف_التحجيم_${new Date().toISOString().slice(0,10)}.xlsx`);
+      XLSX.utils.book_append_sheet(wb, ws, "Orders Archive");
+      XLSX.writeFile(wb, `Tahjeem_Archive_${new Date().toISOString().slice(0,10)}.xlsx`);
     }
 
     async function cleanOldOrders(days) {
-      if (!confirm(`هل أنت متأكد من حذف الطلبات الأقدم من ${days} يوماً لتوفير المساحة؟`)) return;
+      if (!confirm(`Are you sure you want to delete orders older than ${days} days?`)) return;
       await fetch(`/api/orders/clean?days=${days}`, { method: 'DELETE' });
       loadData();
-      alert(`تم تنظيف السجلات بنجاح ✅`);
+      alert(`Records cleaned successfully ✅`);
     }
 
     async function exportAndClearAll() {
-      if (!confirm('⚠️ تحذير: سيتم أولاً تحميل ملف إكسل بكامل السجلات، ثم تفريغ الأرشيف بالكامل من قاعدة البيانات.\nهل ترغب بالمتابعة؟')) return;
+      if (!confirm('⚠️ Warning: Excel backup will be downloaded first, then the entire archive will be purged.\nProceed?')) return;
       exportToExcel();
       setTimeout(async () => {
         await fetch('/api/orders/clear-all', { method: 'DELETE' });
         loadData();
-        alert('تم تصدير البيانات وتفريغ قاعدة البيانات بالكامل بنجاح 🚀');
+        alert('Data exported and database cleared successfully 🚀');
       }, 1500);
     }
 
-    // إدارة لوحة مصاريف الذكاء الاصطناعي (PIN: 1010)
     async function promptCostModal() {
       const pin = prompt('Enter Admin PIN:');
       if (!pin) return;
